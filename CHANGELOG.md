@@ -6,6 +6,17 @@ All notable changes to Engram are documented here. Format follows
 
 ## [Unreleased]
 
+## [2.0.1]
+
+### Added
+- A terminal **demo GIF** in the README (`docs/demo.gif`), reproducible from
+  `docs/demo.tape` with [vhs](https://github.com/charmbracelet/vhs).
+- The two-layer architecture diagram now sits alongside the "Two layers" section.
+
+### Changed
+- `doctor.py` and `memory_lint.py` print `~/…` paths instead of absolute home paths
+  (cleaner output; matches the hook).
+
 ## [2.0.0]
 
 Expanded from a session-continuity loop into the **complete two-layer memory
@@ -52,6 +63,7 @@ First public release.
 - **Installer** (`install.sh`), test suite (`tests/`, stdlib `unittest`), CI
   (tests on Python 3.9–3.13 + ruff + an end-to-end smoke test), and full docs.
 
-[Unreleased]: https://github.com/ramennuts/Obsidian-Engram/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/ramennuts/Obsidian-Engram/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/ramennuts/Obsidian-Engram/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/ramennuts/Obsidian-Engram/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/ramennuts/Obsidian-Engram/releases/tag/v1.0.0

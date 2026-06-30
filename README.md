@@ -19,7 +19,7 @@ hooks, two skills, and a few small scripts — organized into **two memory layer
 clear jobs (durable facts vs. live working state) and the tooling to keep both sharp.
 
 <p align="center">
-  <img src="docs/architecture.svg" alt="Engram memory loop: a session ends by writing a handoff to the vault; the next session starts by injecting a lean bootstrap from it; an archiver keeps the queue lean." width="92%">
+  <img src="docs/demo.gif" alt="Terminal demo: the doctor reports every check green, the SessionStart hook prints a lean bootstrap of current state, and the archiver keeps finished items while leaving still-live ones in place." width="94%">
 </p>
 
 ---
@@ -53,6 +53,10 @@ and automates the two moments that matter:
 
 Engram splits memory by **rate of change** — the thing that makes recall sharp and
 context lean. (Full rationale in [docs/memory-architecture.md](docs/memory-architecture.md).)
+
+<p align="center">
+  <img src="docs/architecture.svg" alt="Two layers: durable memory (who you are, preferences, project facts, references) is always loaded; working memory (LIVE-STATE, build-queue, handoffs) is injected lean at session start. The session draws on both." width="88%">
+</p>
 
 **Layer 1 — Durable memory** (`memory/`): facts true across *all* sessions — who you
 are, your preferences, project context, references. One fact per file with typed

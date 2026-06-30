@@ -83,7 +83,7 @@ def main():
             if target not in slugs:
                 problems.append(f"DANGLING   {f} links [[{target}]] — no such note")
 
-    print(f"[memory-lint] {len(files)} notes in {d}")
+    print(f"[memory-lint] {len(files)} notes in {d.replace(os.path.expanduser('~'), '~')}")
     if not problems:
         print("[memory-lint] ✓ clean — index complete, no dangling links, frontmatter OK")
         return 0

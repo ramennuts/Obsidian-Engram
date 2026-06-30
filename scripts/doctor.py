@@ -18,8 +18,14 @@ REFLECT = os.path.expanduser("~/.claude/skills/reflect/SKILL.md")
 OK, WARN, BAD = "✅", "⚠️ ", "❌"
 
 
+def tilde(p):
+    return p.replace(os.path.expanduser("~"), "~")
+
+
 def check(label, ok, detail="", fix=""):
     mark = OK if ok is True else (WARN if ok == "warn" else BAD)
+    if detail and "/" in detail:
+        detail = tilde(detail)
     line = f"{mark} {label}"
     if detail:
         line += f" — {detail}"
@@ -30,7 +36,7 @@ def check(label, ok, detail="", fix=""):
 
 
 def main():
-    print(f"Engram doctor — vault: {VAULT}\n")
+    print(f"Engram doctor — vault: {tilde(VAULT)}\n")
     passed = True
 
     passed &= check(

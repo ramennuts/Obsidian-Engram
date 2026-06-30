@@ -7,15 +7,17 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VAULT="${1:-${ENGRAM_VAULT:-$HOME/vault}}"
+MEMORY="${ENGRAM_MEMORY:-$HOME/memory}"
 CLAUDE_DIR="$HOME/.claude"
 SKILLS_DIR="$CLAUDE_DIR/skills"
 
 echo "Engram installer"
-echo "  repo : $REPO"
-echo "  vault: $VAULT"
+echo "  repo  : $REPO"
+echo "  vault : $VAULT   (Layer 2 — working memory)"
+echo "  memory: $MEMORY   (Layer 1 — durable memory)"
 echo
 
-# 1. Vault — seed from the template if it doesn't exist yet.
+# 1. Working-memory vault — seed from the template if it doesn't exist yet.
 if [ -d "$VAULT" ]; then
   echo "✓ vault already exists at $VAULT (leaving it untouched)"
 else
@@ -23,19 +25,28 @@ else
   echo "✓ created vault at $VAULT from vault-template/"
 fi
 
-# 2. /handoff skill.
+# 2. Durable-memory dir — seed from the template if it doesn't exist yet.
+if [ -d "$MEMORY" ]; then
+  echo "✓ memory dir already exists at $MEMORY (leaving it untouched)"
+else
+  cp -R "$REPO/memory-template" "$MEMORY"
+  echo "✓ created memory dir at $MEMORY from memory-template/"
+fi
+
+# 3. Skills.
 mkdir -p "$SKILLS_DIR"
-cp -R "$REPO/skills/handoff" "$SKILLS_DIR/"
-echo "✓ installed /handoff skill -> $SKILLS_DIR/handoff"
+cp -R "$REPO/skills/handoff" "$REPO/skills/reflect" "$SKILLS_DIR/"
+echo "✓ installed /handoff and /reflect skills -> $SKILLS_DIR/"
 
 # 3. Tell the user how to finish (we don't edit settings.json for them).
 cat <<EOF
 
 Almost done — two manual steps:
 
-1) Add ENGRAM_VAULT to your shell profile so the scripts find your vault:
+1) Add the paths to your shell profile so the scripts find them:
 
-   echo 'export ENGRAM_VAULT="$VAULT"' >> ~/.zshrc   # or ~/.bashrc
+   echo 'export ENGRAM_VAULT="$VAULT"'   >> ~/.zshrc   # or ~/.bashrc
+   echo 'export ENGRAM_MEMORY="$MEMORY"' >> ~/.zshrc
 
 2) Register the SessionStart hook: merge this into $CLAUDE_DIR/settings.json
    (keep any existing "hooks"):
@@ -51,7 +62,8 @@ Almost done — two manual steps:
 
 Then verify everything:
 
-   ENGRAM_VAULT="$VAULT" python3 $REPO/scripts/doctor.py
+   ENGRAM_VAULT="$VAULT" ENGRAM_MEMORY="$MEMORY" python3 $REPO/scripts/doctor.py
+   ENGRAM_MEMORY="$MEMORY" python3 $REPO/scripts/memory_lint.py
 
 Optional — keep the queue lean by running the archiver weekly (cron example):
 

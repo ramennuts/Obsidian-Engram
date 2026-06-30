@@ -14,8 +14,9 @@ Code](https://docs.claude.com/en/docs/claude-code) (or any agent that supports h
 and skills) **resume work across sessions with full context** — instead of waking up
 amnesiac every time.
 
-No database, no embeddings, no paid APIs, no network calls. Just markdown in an
-Obsidian vault, a hook, a skill, and a small script.
+No database, no embeddings, no paid APIs, no network calls. Just markdown, a couple of
+hooks, two skills, and a few small scripts — organized into **two memory layers** with
+clear jobs (durable facts vs. live working state) and the tooling to keep both sharp.
 
 <p align="center">
   <img src="docs/architecture.svg" alt="Engram memory loop: a session ends by writing a handoff to the vault; the next session starts by injecting a lean bootstrap from it; an archiver keeps the queue lean." width="92%">
@@ -48,7 +49,19 @@ and automates the two moments that matter:
 3. **Stay lean — automatic.** A weekly script archives finished items out of the work
    queue so the injected context stays high-signal as the vault grows.
 
-## The memory spine (three files in your vault)
+## Two layers of memory
+
+Engram splits memory by **rate of change** — the thing that makes recall sharp and
+context lean. (Full rationale in [docs/memory-architecture.md](docs/memory-architecture.md).)
+
+**Layer 1 — Durable memory** (`memory/`): facts true across *all* sessions — who you
+are, your preferences, project context, references. One fact per file with typed
+frontmatter (`user` / `feedback` / `project` / `reference`), indexed by `MEMORY.md`,
+linked with `[[wikilinks]]`. Loaded every session; pruned/consolidated periodically.
+Spec: [docs/memory-format.md](docs/memory-format.md) · starter: [`memory-template/`](memory-template).
+
+**Layer 2 — Working memory** (the vault): the state of the work *right now* —
+fast-changing, injected lean at session start.
 
 | File | Role |
 |------|------|
@@ -56,25 +69,51 @@ and automates the two moments that matter:
 | `build-queue.md` | The **work queue** — `## Active items` (current work) and `## Blocked`. Finished items get struck and archived. |
 | `handoffs/` | **Dated session handoffs.** The newest is the pickup brief. |
 
-Everything else in your vault is yours — notes, references, decisions — connected by
-Obsidian wikilinks. Engram only cares about those three.
+The rule of thumb: *"still true and useful three months from now in an unrelated
+session?"* → durable. *"about what we're doing right now?"* → working.
+
+## The full toolkit
+
+| Piece | Layer | What it does |
+|-------|-------|--------------|
+| `hooks/session-start.py` | both | Injects a lean bootstrap (durable index is already loaded; this adds working state) at session start. |
+| `skills/handoff/` | working | `/handoff` writes a detailed session handoff. |
+| `skills/reflect/` | both | `/reflect` reviews recent work and *proposes* improvements to memory + workflow (never self-applies). |
+| `scripts/archive_finished_queue.py` | working | Conservatively archives finished queue items. |
+| `scripts/memory_lint.py` | durable | Checks the `memory/` dir for orphans, dangling links, and bad frontmatter. |
+| `scripts/doctor.py` | both | Verifies the whole setup is wired correctly. |
+| `hooks/guard.py` | both | Optional **rules-as-hooks** guard — makes a load-bearing rule deterministic instead of hoping the agent remembers it. |
+
+Everything else in your vault/memory is yours, tied together with wikilinks. Engram only
+owns the spine files and the tooling above.
 
 ## What's in this repo
 
 ```
 engram/
-├── hooks/session-start.py             # SessionStart hook — lean bootstrap injector
-├── skills/handoff/SKILL.md            # /handoff skill — writes detailed handoffs
+├── hooks/
+│   ├── session-start.py               # SessionStart hook — lean bootstrap injector
+│   └── guard.py                       # optional rules-as-hooks PreToolUse guard
+├── skills/
+│   ├── handoff/SKILL.md               # /handoff — writes detailed session handoffs
+│   └── reflect/SKILL.md               # /reflect — proposes improvements (never self-applies)
 ├── scripts/
-│   ├── archive_finished_queue.py      # keeps the queue lean (run weekly)
-│   └── doctor.py                      # checks your setup is wired correctly
-├── vault-template/                    # a ready-to-use skeleton vault (copy this)
+│   ├── archive_finished_queue.py      # keeps the work queue lean (run weekly)
+│   ├── memory_lint.py                 # checks durable-memory integrity
+│   └── doctor.py                      # checks your whole setup is wired correctly
+├── memory-template/                   # Layer 1 — durable-memory starter (index + examples)
+│   ├── MEMORY.md
+│   └── user_example.md  feedback_example.md  project_example.md  reference_example.md
+├── vault-template/                    # Layer 2 — working-memory skeleton vault
 │   ├── LIVE-STATE.md  build-queue.md  00-Index.md  CLAUDE.md
 │   └── handoffs/2025-01-15-example-handoff.md
-├── tests/                             # stdlib unittest — classifier + hook behavior
+├── tests/                             # stdlib unittest — 29 tests across every tool
 ├── install.sh                         # one-command setup
-├── settings.example.json              # how to register the hook
+├── settings.example.json              # env vars + hook registration
 └── docs/
+    ├── memory-architecture.md         # the two-layer model (start here)
+    ├── memory-format.md               # the durable-note spec
+    ├── principles.md                  # the six operating principles
     ├── design.md                      # the principles + the mistakes behind them
     └── architecture.svg               # the diagram above
 ```
@@ -85,18 +124,23 @@ Verify your install anytime with **`python3 scripts/doctor.py`**.
 
 ```bash
 git clone https://github.com/ramennuts/Obsidian-Engram.git ~/engram
+cd ~/engram && ./install.sh            # seeds the vault + memory dir, installs the skills
 
-# 1. Make (or pick) an Obsidian vault and seed the memory spine:
-cp -R ~/engram/vault-template ~/vault        # or merge into an existing vault
+# …or do it by hand:
 
-# 2. Point Engram at it (add to your shell profile to persist):
+# 1. Seed both memory layers:
+cp -R ~/engram/vault-template  ~/vault     # Layer 2 — working memory
+cp -R ~/engram/memory-template ~/memory    # Layer 1 — durable memory
+
+# 2. Point Engram at them (add to your shell profile to persist):
 export ENGRAM_VAULT="$HOME/vault"
+export ENGRAM_MEMORY="$HOME/memory"
 
-# 3. Install the /handoff skill:
-mkdir -p ~/.claude/skills && cp -R ~/engram/skills/handoff ~/.claude/skills/
+# 3. Install the skills:
+mkdir -p ~/.claude/skills && cp -R ~/engram/skills/handoff ~/engram/skills/reflect ~/.claude/skills/
 
-# 4. Register the SessionStart hook: merge the "hooks" block from
-#    settings.example.json into ~/.claude/settings.json (keep your existing hooks).
+# 4. Register the SessionStart hook (and optionally the guard): merge the "hooks"
+#    block from settings.example.json into ~/.claude/settings.json.
 
 # 5. (optional) Run the queue archiver weekly. macOS launchd / cron, e.g.:
 #    0 7 * * 1  /usr/bin/python3 ~/engram/scripts/archive_finished_queue.py --apply

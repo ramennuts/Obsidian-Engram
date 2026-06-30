@@ -1,73 +1,63 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 460" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 580" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
   <style>
-    .card { fill: #ffffff; stroke: #c7d2fe; stroke-width: 1.5; }
-    .vault { fill: #eef2ff; stroke: #6366f1; stroke-width: 2; }
-    .file { fill: #ffffff; stroke: #a5b4fc; stroke-width: 1.2; }
-    .title { font-size: 15px; font-weight: 700; fill: #1e1b4b; }
-    .label { font-size: 13px; font-weight: 600; fill: #312e81; }
+    .panel { fill: #eef2ff; stroke: #6366f1; stroke-width: 1.8; }
+    .card { fill: #ffffff; stroke: #a5b4fc; stroke-width: 1.2; }
+    .session { fill: #4f46e5; stroke: #4338ca; stroke-width: 2; }
+    .title { font-size: 18px; font-weight: 700; fill: #1e1b4b; }
+    .ptitle { font-size: 14px; font-weight: 700; fill: #312e81; }
+    .label { font-size: 12.5px; font-weight: 600; fill: #312e81; }
     .sub { font-size: 11.5px; fill: #4b5563; }
-    .accent { font-size: 12px; font-weight: 700; fill: #4f46e5; }
-    .arrow { stroke: #6366f1; stroke-width: 2; fill: none; }
-    .arrowdim { stroke: #94a3b8; stroke-width: 1.8; fill: none; stroke-dasharray: 5 4; }
+    .chip { font-size: 11px; font-weight: 700; fill: #3730a3; }
+    .white { font-size: 15px; font-weight: 700; fill: #ffffff; }
+    .whitesub { font-size: 11.5px; fill: #e0e7ff; }
+    .accent { font-size: 11.5px; font-weight: 700; fill: #4f46e5; }
+    .arrow { stroke: #6366f1; stroke-width: 2.2; fill: none; }
+    .arrowdim { stroke: #94a3b8; stroke-width: 1.6; fill: none; stroke-dasharray: 5 4; }
   </style>
   <defs>
-    <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
-      <path d="M0,0 L7,3 L0,6 Z" fill="#6366f1"/>
-    </marker>
-    <marker id="ahd" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
-      <path d="M0,0 L7,3 L0,6 Z" fill="#94a3b8"/>
-    </marker>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6366f1"/></marker>
+    <marker id="ahd" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#94a3b8"/></marker>
   </defs>
 
-  <rect x="0" y="0" width="860" height="460" fill="none"/>
-  <text x="430" y="34" text-anchor="middle" class="title" font-size="18">Engram — the cross-session memory loop</text>
+  <rect x="0" y="0" width="760" height="580" fill="#f8fafc"/>
 
-  <!-- Session N (left) -->
-  <rect x="36" y="70" width="200" height="96" rx="12" class="card"/>
-  <text x="136" y="104" text-anchor="middle" class="label">Session N — ending</text>
-  <text x="136" y="128" text-anchor="middle" class="accent">/handoff</text>
-  <text x="136" y="148" text-anchor="middle" class="sub">writes a detailed handoff</text>
+  <text x="380" y="32" text-anchor="middle" class="title">Engram — two layers of agent memory</text>
 
-  <!-- Vault (center) -->
-  <rect x="330" y="58" width="200" height="240" rx="14" class="vault"/>
-  <text x="430" y="86" text-anchor="middle" class="label">Obsidian vault</text>
-  <text x="430" y="104" text-anchor="middle" class="sub">plain markdown — no DB</text>
-  <rect x="350" y="120" width="160" height="42" rx="8" class="file"/>
-  <text x="430" y="139" text-anchor="middle" class="sub" font-weight="700">LIVE-STATE.md</text>
-  <text x="430" y="154" text-anchor="middle" class="sub">ground-truth board</text>
-  <rect x="350" y="172" width="160" height="42" rx="8" class="file"/>
-  <text x="430" y="191" text-anchor="middle" class="sub" font-weight="700">build-queue.md</text>
-  <text x="430" y="206" text-anchor="middle" class="sub">active / blocked work</text>
-  <rect x="350" y="224" width="160" height="42" rx="8" class="file"/>
-  <text x="430" y="243" text-anchor="middle" class="sub" font-weight="700">handoffs/</text>
-  <text x="430" y="258" text-anchor="middle" class="sub">dated pickup briefs</text>
+  <!-- LAYER 1 — durable memory -->
+  <rect x="70" y="52" width="620" height="118" rx="14" class="panel"/>
+  <text x="90" y="76" class="ptitle">LAYER 1 · DURABLE MEMORY</text>
+  <text x="670" y="76" text-anchor="end" class="sub">slow-changing · loaded every session</text>
+  <text x="90" y="96" class="sub"><tspan font-weight="700">memory/</tspan> — one fact per file, indexed by MEMORY.md, linked with [[wikilinks]]</text>
+  <rect x="92"  y="110" width="138" height="44" rx="8" class="card"/><text x="161" y="130" text-anchor="middle" class="chip">user</text><text x="161" y="146" text-anchor="middle" class="sub">who you are</text>
+  <rect x="244" y="110" width="138" height="44" rx="8" class="card"/><text x="313" y="130" text-anchor="middle" class="chip">feedback</text><text x="313" y="146" text-anchor="middle" class="sub">how to work</text>
+  <rect x="396" y="110" width="138" height="44" rx="8" class="card"/><text x="465" y="130" text-anchor="middle" class="chip">project</text><text x="465" y="146" text-anchor="middle" class="sub">ongoing work</text>
+  <rect x="548" y="110" width="138" height="44" rx="8" class="card"/><text x="617" y="130" text-anchor="middle" class="chip">reference</text><text x="617" y="146" text-anchor="middle" class="sub">pointers</text>
 
-  <!-- Session N+1 (right) -->
-  <rect x="624" y="70" width="200" height="96" rx="12" class="card"/>
-  <text x="724" y="104" text-anchor="middle" class="label">Session N+1 — starting</text>
-  <text x="724" y="128" text-anchor="middle" class="accent">SessionStart hook</text>
-  <text x="724" y="148" text-anchor="middle" class="sub">injects a lean bootstrap</text>
+  <!-- arrow down into session -->
+  <path class="arrow" d="M380,170 L380,232" marker-end="url(#ah)"/>
+  <text x="392" y="205" class="accent">always-on context</text>
 
-  <!-- Archiver (bottom) -->
-  <rect x="330" y="360" width="200" height="74" rx="12" class="card"/>
-  <text x="430" y="389" text-anchor="middle" class="label">Queue archiver</text>
-  <text x="430" y="409" text-anchor="middle" class="sub">weekly — keeps the queue</text>
-  <text x="430" y="424" text-anchor="middle" class="sub">lean so the inject stays sharp</text>
+  <!-- THE SESSION -->
+  <rect x="250" y="234" width="260" height="72" rx="14" class="session"/>
+  <text x="380" y="266" text-anchor="middle" class="white">THE SESSION</text>
+  <text x="380" y="288" text-anchor="middle" class="whitesub">the agent at work — grounded on both layers</text>
 
-  <!-- Arrows -->
-  <path class="arrow" d="M236,118 C 280,118 295,150 328,160" marker-end="url(#ah)"/>
-  <text x="262" y="108" class="sub" fill="#4f46e5" font-weight="700">write</text>
+  <!-- arrows between session and layer 2 -->
+  <path class="arrow" d="M330,370 C 300,345 300,322 330,306" marker-end="url(#ah)"/>
+  <text x="250" y="345" text-anchor="middle" class="accent">lean bootstrap ↑<tspan x="250" dy="14" class="sub">SessionStart hook</tspan></text>
+  <path class="arrow" d="M450,306 C 480,322 480,345 450,370" marker-end="url(#ah)"/>
+  <text x="512" y="345" text-anchor="middle" class="accent">↓ /handoff<tspan x="512" dy="14" class="sub">at session end</tspan></text>
 
-  <path class="arrow" d="M532,160 C 565,150 580,118 622,118" marker-end="url(#ah)"/>
-  <text x="566" y="108" class="sub" fill="#4f46e5" font-weight="700">read</text>
+  <!-- LAYER 2 — working memory -->
+  <rect x="70" y="372" width="620" height="130" rx="14" class="panel"/>
+  <text x="90" y="396" class="ptitle">LAYER 2 · WORKING MEMORY</text>
+  <text x="670" y="396" text-anchor="end" class="sub">fast-changing · injected lean at start</text>
+  <text x="90" y="416" class="sub"><tspan font-weight="700">the vault</tspan> — the state of the work right now</text>
+  <rect x="92"  y="430" width="186" height="58" rx="8" class="card"/><text x="185" y="452" text-anchor="middle" class="label">LIVE-STATE.md</text><text x="185" y="470" text-anchor="middle" class="sub">verified ground truth</text>
+  <rect x="288" y="430" width="186" height="58" rx="8" class="card"/><text x="381" y="452" text-anchor="middle" class="label">build-queue.md</text><text x="381" y="470" text-anchor="middle" class="sub">active / blocked work</text>
+  <rect x="484" y="430" width="202" height="58" rx="8" class="card"/><text x="585" y="452" text-anchor="middle" class="label">handoffs/</text><text x="585" y="470" text-anchor="middle" class="sub">dated pickup briefs</text>
 
-  <!-- loop-back: N+1 becomes the next N -->
-  <path class="arrowdim" d="M724,166 C 724,330 480,348 236,150" marker-end="url(#ahd)"/>
-  <text x="600" y="344" text-anchor="middle" class="sub">…the loop repeats — each session resumes grounded</text>
-
-  <!-- archiver maintains the queue -->
-  <path class="arrowdim" d="M430,358 L430,300" marker-end="url(#ahd)"/>
-  <text x="446" y="332" class="sub">prunes finished items</text>
-
-  <text x="430" y="452" text-anchor="middle" class="sub" fill="#6b7280">Read is automatic · Write is one command · The vault is the single source of truth</text>
+  <!-- maintenance note -->
+  <text x="380" y="526" text-anchor="middle" class="sub" fill="#475569">archiver keeps the queue lean · memory_lint keeps the index honest</text>
+  <text x="380" y="552" text-anchor="middle" class="sub" fill="#475569">Durable = who you are &amp; how to work · Working = where the work is · Read is automatic, write is one command</text>
 </svg>

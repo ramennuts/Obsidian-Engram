@@ -1,7 +1,8 @@
 {
-  "//": "Engram hook registration for Claude Code. Merge the `hooks` block into your ~/.claude/settings.json (keep your existing hooks/permissions). Set ENGRAM_VAULT to your vault path, or edit the default at the top of each script.",
+  "//": "Engram setup for Claude Code. Merge the env + hooks blocks into your ~/.claude/settings.json (keep your existing entries). Replace /Users/you/... with real paths. ENGRAM_VAULT = working-memory vault; ENGRAM_MEMORY = durable-memory dir (optional).",
   "env": {
-    "ENGRAM_VAULT": "/Users/you/vault"
+    "ENGRAM_VAULT": "/Users/you/vault",
+    "ENGRAM_MEMORY": "/Users/you/memory"
   },
   "hooks": {
     "SessionStart": [
@@ -10,6 +11,18 @@
           {
             "type": "command",
             "command": "python3 /Users/you/engram/hooks/session-start.py"
+          }
+        ]
+      }
+    ],
+    "//PreToolUse": "Optional: the deterministic rules-as-hooks guard. Edit hooks/guard.py's BLOCKED list first, then uncomment by renaming this key to 'PreToolUse'.",
+    "PreToolUse-disabled-rename-to-enable": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/you/engram/hooks/guard.py"
           }
         ]
       }

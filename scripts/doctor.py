@@ -10,8 +10,10 @@ import os
 import sys
 
 VAULT = os.environ.get("ENGRAM_VAULT", os.path.expanduser("~/vault"))
+MEMORY = os.environ.get("ENGRAM_MEMORY", "")
 SETTINGS = os.path.expanduser("~/.claude/settings.json")
 SKILL = os.path.expanduser("~/.claude/skills/handoff/SKILL.md")
+REFLECT = os.path.expanduser("~/.claude/skills/reflect/SKILL.md")
 
 OK, WARN, BAD = "✅", "⚠️ ", "❌"
 
@@ -77,6 +79,24 @@ def main():
         "/handoff skill installed", os.path.isfile(SKILL), SKILL,
         "cp -R skills/handoff ~/.claude/skills/",
     )
+    check(
+        "/reflect skill installed (optional)",
+        True if os.path.isfile(REFLECT) else "warn", REFLECT,
+        "cp -R skills/reflect ~/.claude/skills/",
+    )
+
+    # Durable-memory layer (optional — only checked if ENGRAM_MEMORY is set).
+    if MEMORY:
+        idx = os.path.join(MEMORY, "MEMORY.md")
+        passed &= check("Durable memory dir exists", os.path.isdir(MEMORY), MEMORY,
+                        f"cp -R memory-template {MEMORY}")
+        check("MEMORY.md index present",
+              True if os.path.isfile(idx) else "warn", "",
+              f"add a MEMORY.md index in {MEMORY}")
+        print("     (run `python3 scripts/memory_lint.py` to check index integrity)")
+    else:
+        check("Durable-memory layer", "warn", "ENGRAM_MEMORY not set",
+              "optional — set ENGRAM_MEMORY to your memory/ dir to enable Layer-1 checks")
 
     print()
     if passed:

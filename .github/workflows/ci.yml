@@ -47,7 +47,12 @@ jobs:
           ENGRAM_VAULT: ${{ github.workspace }}/vault-template
         run: |
           python3 hooks/session-start.py | python3 -c "import json,sys; c=json.load(sys.stdin)['hookSpecificOutput']['additionalContext']; assert len(c) < 10000, 'injection too large'; print('lean injection OK:', len(c), 'chars')"
+      - name: Memory linter passes on the template
+        env:
+          ENGRAM_MEMORY: ${{ github.workspace }}/memory-template
+        run: python3 scripts/memory_lint.py
       - name: Doctor runs
         env:
           ENGRAM_VAULT: ${{ github.workspace }}/vault-template
+          ENGRAM_MEMORY: ${{ github.workspace }}/memory-template
         run: python3 scripts/doctor.py || true

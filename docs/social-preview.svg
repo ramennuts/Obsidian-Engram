@@ -44,22 +44,23 @@
   <rect width="1280" height="640" fill="url(#glow)"/>
 
   <!-- obsidian crystal shards (faceted volcanic glass) -->
-  <g stroke="#c4b5fd" stroke-opacity="0.28" stroke-width="1.2" stroke-linejoin="round">
-    <!-- bottom-right cluster, behind the cards -->
-    <polygon points="1080,640 1160,360 1280,470 1280,640" fill="url(#cryA)" fill-opacity="0.55"/>
-    <polygon points="1160,360 1280,300 1280,470" fill="url(#cryB)" fill-opacity="0.45"/>
-    <polygon points="980,640 1080,420 1140,640" fill="url(#cryC)" fill-opacity="0.30"/>
-    <polygon points="1200,150 1280,120 1280,300 1170,300" fill="url(#cryB)" fill-opacity="0.30"/>
+  <g stroke="#c4b5fd" stroke-opacity="0.26" stroke-width="1.2" stroke-linejoin="round">
+    <!-- bottom-right cluster, BELOW the cards -->
+    <polygon points="1080,640 1190,512 1280,565 1280,640" fill="url(#cryA)" fill-opacity="0.42"/>
+    <polygon points="1190,512 1280,478 1280,565" fill="url(#cryB)" fill-opacity="0.34"/>
+    <polygon points="985,640 1078,528 1150,640" fill="url(#cryC)" fill-opacity="0.24"/>
+    <!-- small accent in the top-right corner, ABOVE the cards -->
+    <polygon points="1196,0 1280,0 1280,112 1218,94" fill="url(#cryB)" fill-opacity="0.26"/>
     <!-- top-left accent -->
     <polygon points="0,0 150,0 70,150 0,120" fill="url(#cryA)" fill-opacity="0.40"/>
     <polygon points="0,120 70,150 0,260" fill="url(#cryC)" fill-opacity="0.22"/>
     <!-- bottom-left sliver -->
     <polygon points="0,520 120,640 0,640" fill="url(#cryB)" fill-opacity="0.30"/>
   </g>
-  <!-- a couple of bright facet highlights -->
-  <g stroke="#ede9fe" stroke-opacity="0.45" stroke-width="1.4" fill="none">
-    <polyline points="1160,360 1280,300"/>
-    <polyline points="1080,640 1160,360"/>
+  <!-- bright facet highlights on the lower-right shards -->
+  <g stroke="#ede9fe" stroke-opacity="0.4" stroke-width="1.4" fill="none">
+    <polyline points="1190,512 1280,478"/>
+    <polyline points="1080,640 1190,512"/>
   </g>
 
   <!-- ===================== LEFT: text column (x ≤ ~700) ===================== -->
@@ -78,15 +79,12 @@
   <!-- frosted-glass feature chips -->
   <g font-size="21" font-weight="700" fill="#f5f3ff">
     <rect x="84"  y="478" width="226" height="56" rx="28" fill="url(#glass)" stroke="#a78bfa" stroke-opacity="0.45"/>
-    <rect x="84"  y="479" width="226" height="2"  rx="1"  fill="url(#edge)"/>
     <text x="197" y="513" text-anchor="middle">two memory layers</text>
 
     <rect x="326" y="478" width="214" height="56" rx="28" fill="url(#glass)" stroke="#a78bfa" stroke-opacity="0.45"/>
-    <rect x="326" y="479" width="214" height="2"  rx="1"  fill="url(#edge)"/>
     <text x="433" y="513" text-anchor="middle">no DB · no deps</text>
 
     <rect x="556" y="478" width="150" height="56" rx="28" fill="url(#glass)" stroke="#a78bfa" stroke-opacity="0.45"/>
-    <rect x="556" y="479" width="150" height="2"  rx="1"  fill="url(#edge)"/>
     <text x="631" y="513" text-anchor="middle">fail-open</text>
   </g>
 
@@ -97,13 +95,11 @@
 
   <g>
     <rect x="848" y="166" width="356" height="156" rx="20" fill="url(#glass)" stroke="#c4b5fd" stroke-opacity="0.55"/>
-    <rect x="864" y="167" width="324" height="2" rx="1" fill="url(#edge)"/>
     <text x="878" y="214" font-size="23" font-weight="800" fill="#ffffff">LAYER 1 · durable</text>
     <text x="878" y="248" font-size="18" fill="#d7d0f7">who you are · prefs · projects</text>
     <text x="878" y="284" font-size="16" font-style="italic" fill="#a78bfa">always loaded</text>
 
     <rect x="848" y="340" width="356" height="156" rx="20" fill="url(#glass)" stroke="#c4b5fd" stroke-opacity="0.55"/>
-    <rect x="864" y="341" width="324" height="2" rx="1" fill="url(#edge)"/>
     <text x="878" y="388" font-size="23" font-weight="800" fill="#ffffff">LAYER 2 · working</text>
     <text x="878" y="422" font-size="18" fill="#d7d0f7">live state · queue · handoffs</text>
     <text x="878" y="458" font-size="16" font-style="italic" fill="#a78bfa">injected lean at start</text>

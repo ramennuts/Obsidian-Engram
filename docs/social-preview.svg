@@ -1,51 +1,115 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
   <defs>
+    <!-- obsidian base -->
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1e1b4b"/>
-      <stop offset="1" stop-color="#3730a3"/>
+      <stop offset="0" stop-color="#08070f"/>
+      <stop offset="0.55" stop-color="#0f0b22"/>
+      <stop offset="1" stop-color="#15103a"/>
     </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.28" r="0.7">
+      <stop offset="0" stop-color="#6d28d9" stop-opacity="0.55"/>
+      <stop offset="0.5" stop-color="#4c1d95" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#4c1d95" stop-opacity="0"/>
+    </radialGradient>
+    <!-- crystal facet fills -->
+    <linearGradient id="cryA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#2e1065"/>
+    </linearGradient>
+    <linearGradient id="cryB" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="cryC" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c4b5fd"/><stop offset="1" stop-color="#4c1d95"/>
+    </linearGradient>
+    <!-- frosted glass -->
     <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#a78bfa" stop-opacity="0.06"/>
     </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.08"/>
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <filter id="wordglow" x="-30%" y="-60%" width="160%" height="220%">
+      <feGaussianBlur stdDeviation="11"/>
+    </filter>
   </defs>
 
+  <!-- base -->
   <rect width="1280" height="640" fill="url(#bg)"/>
-  <!-- soft accent blobs -->
-  <circle cx="1180" cy="90" r="220" fill="#6366f1" opacity="0.18"/>
-  <circle cx="1120" cy="560" r="180" fill="#818cf8" opacity="0.12"/>
+  <rect width="1280" height="640" fill="url(#glow)"/>
 
-  <!-- wordmark -->
-  <text x="90" y="190" font-size="104" font-weight="800" fill="#ffffff" letter-spacing="-2">Engram</text>
-  <text x="92" y="248" font-size="30" font-weight="600" fill="#c7d2fe">Persistent memory for Claude Code — built on a plain Obsidian vault.</text>
-
-  <!-- one-liner -->
-  <text x="92" y="312" font-size="23" fill="#a5b4fc">Resume any session with full context, instead of waking up amnesiac every time.</text>
-
-  <!-- feature chips -->
-  <g font-size="22" font-weight="700" fill="#e0e7ff">
-    <rect x="90"  y="356" width="232" height="58" rx="29" fill="url(#glass)" stroke="#6366f1" stroke-opacity="0.5"/>
-    <text x="206" y="393" text-anchor="middle">two memory layers</text>
-    <rect x="338" y="356" width="220" height="58" rx="29" fill="url(#glass)" stroke="#6366f1" stroke-opacity="0.5"/>
-    <text x="448" y="393" text-anchor="middle">no DB · no deps</text>
-    <rect x="574" y="356" width="170" height="58" rx="29" fill="url(#glass)" stroke="#6366f1" stroke-opacity="0.5"/>
-    <text x="659" y="393" text-anchor="middle">fail-open</text>
+  <!-- obsidian crystal shards (faceted volcanic glass) -->
+  <g stroke="#c4b5fd" stroke-opacity="0.28" stroke-width="1.2" stroke-linejoin="round">
+    <!-- bottom-right cluster, behind the cards -->
+    <polygon points="1080,640 1160,360 1280,470 1280,640" fill="url(#cryA)" fill-opacity="0.55"/>
+    <polygon points="1160,360 1280,300 1280,470" fill="url(#cryB)" fill-opacity="0.45"/>
+    <polygon points="980,640 1080,420 1140,640" fill="url(#cryC)" fill-opacity="0.30"/>
+    <polygon points="1200,150 1280,120 1280,300 1170,300" fill="url(#cryB)" fill-opacity="0.30"/>
+    <!-- top-left accent -->
+    <polygon points="0,0 150,0 70,150 0,120" fill="url(#cryA)" fill-opacity="0.40"/>
+    <polygon points="0,120 70,150 0,260" fill="url(#cryC)" fill-opacity="0.22"/>
+    <!-- bottom-left sliver -->
+    <polygon points="0,520 120,640 0,640" fill="url(#cryB)" fill-opacity="0.30"/>
+  </g>
+  <!-- a couple of bright facet highlights -->
+  <g stroke="#ede9fe" stroke-opacity="0.45" stroke-width="1.4" fill="none">
+    <polyline points="1160,360 1280,300"/>
+    <polyline points="1080,640 1160,360"/>
   </g>
 
-  <!-- two-layer glyph (right) -->
-  <g transform="translate(840,300)">
-    <rect x="0" y="-150" width="350" height="120" rx="16" fill="url(#glass)" stroke="#a5b4fc" stroke-opacity="0.7"/>
-    <text x="24" y="-112" font-size="20" font-weight="700" fill="#ffffff">LAYER 1 · durable</text>
-    <text x="24" y="-80" font-size="17" fill="#c7d2fe">who you are · prefs · projects</text>
-    <text x="24" y="-54" font-size="15" fill="#a5b4fc" font-style="italic">always loaded</text>
+  <!-- ===================== LEFT: text column (x ≤ ~700) ===================== -->
+  <!-- wordmark with soft violet glow -->
+  <text x="80" y="252" font-size="118" font-weight="800" letter-spacing="-3"
+        fill="#8b5cf6" filter="url(#wordglow)" opacity="0.85">Engram</text>
+  <text x="80" y="250" font-size="118" font-weight="800" letter-spacing="-3" fill="#ffffff">Engram</text>
 
-    <rect x="0" y="6" width="350" height="120" rx="16" fill="url(#glass)" stroke="#a5b4fc" stroke-opacity="0.7"/>
-    <text x="24" y="44" font-size="20" font-weight="700" fill="#ffffff">LAYER 2 · working</text>
-    <text x="24" y="76" font-size="17" fill="#c7d2fe">live state · queue · handoffs</text>
-    <text x="24" y="102" font-size="15" fill="#a5b4fc" font-style="italic">injected lean at start</text>
+  <!-- tagline (wrapped, stays left of the cards) -->
+  <text x="84" y="312" font-size="33" font-weight="600" fill="#ddd6fe">Persistent memory for Claude Code —</text>
+  <text x="84" y="356" font-size="33" font-weight="600" fill="#ddd6fe">built on a plain Obsidian vault.</text>
+
+  <text x="84" y="410" font-size="22" fill="#9d96c9">Resume any session with full context —</text>
+  <text x="84" y="440" font-size="22" fill="#9d96c9">no waking up amnesiac every time.</text>
+
+  <!-- frosted-glass feature chips -->
+  <g font-size="21" font-weight="700" fill="#f5f3ff">
+    <rect x="84"  y="478" width="226" height="56" rx="28" fill="url(#glass)" stroke="#a78bfa" stroke-opacity="0.45"/>
+    <rect x="84"  y="479" width="226" height="2"  rx="1"  fill="url(#edge)"/>
+    <text x="197" y="513" text-anchor="middle">two memory layers</text>
+
+    <rect x="326" y="478" width="214" height="56" rx="28" fill="url(#glass)" stroke="#a78bfa" stroke-opacity="0.45"/>
+    <rect x="326" y="479" width="214" height="2"  rx="1"  fill="url(#edge)"/>
+    <text x="433" y="513" text-anchor="middle">no DB · no deps</text>
+
+    <rect x="556" y="478" width="150" height="56" rx="28" fill="url(#glass)" stroke="#a78bfa" stroke-opacity="0.45"/>
+    <rect x="556" y="479" width="150" height="2"  rx="1"  fill="url(#edge)"/>
+    <text x="631" y="513" text-anchor="middle">fail-open</text>
+  </g>
+
+  <!-- ===================== RIGHT: two glass layer cards (x ≥ 840) ===================== -->
+  <!-- soft shadow under cards -->
+  <rect x="852" y="172" width="356" height="156" rx="20" fill="#000000" opacity="0.25" filter="url(#soft)"/>
+  <rect x="852" y="346" width="356" height="156" rx="20" fill="#000000" opacity="0.25" filter="url(#soft)"/>
+
+  <g>
+    <rect x="848" y="166" width="356" height="156" rx="20" fill="url(#glass)" stroke="#c4b5fd" stroke-opacity="0.55"/>
+    <rect x="864" y="167" width="324" height="2" rx="1" fill="url(#edge)"/>
+    <text x="878" y="214" font-size="23" font-weight="800" fill="#ffffff">LAYER 1 · durable</text>
+    <text x="878" y="248" font-size="18" fill="#d7d0f7">who you are · prefs · projects</text>
+    <text x="878" y="284" font-size="16" font-style="italic" fill="#a78bfa">always loaded</text>
+
+    <rect x="848" y="340" width="356" height="156" rx="20" fill="url(#glass)" stroke="#c4b5fd" stroke-opacity="0.55"/>
+    <rect x="864" y="341" width="324" height="2" rx="1" fill="url(#edge)"/>
+    <text x="878" y="388" font-size="23" font-weight="800" fill="#ffffff">LAYER 2 · working</text>
+    <text x="878" y="422" font-size="18" fill="#d7d0f7">live state · queue · handoffs</text>
+    <text x="878" y="458" font-size="16" font-style="italic" fill="#a78bfa">injected lean at start</text>
   </g>
 
   <!-- footer -->
-  <text x="92" y="566" font-size="22" font-weight="600" fill="#818cf8">github.com/ramennuts/Obsidian-Engram</text>
-  <text x="1190" y="566" text-anchor="end" font-size="20" fill="#6366f1">MIT · for Claude Code + Obsidian</text>
+  <text x="84" y="586" font-size="22" font-weight="700" fill="#a78bfa">github.com/ramennuts/Obsidian-Engram</text>
+  <text x="1196" y="586" text-anchor="end" font-size="19" fill="#6d5fb0">MIT · Claude Code + Obsidian</text>
 </svg>

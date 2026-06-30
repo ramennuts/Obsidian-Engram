@@ -1,0 +1,26 @@
+# Engram has NO runtime dependencies (standard library only) and is not meant to be
+# pip-installed — the hook/scripts run standalone. This file only configures dev
+# tooling (ruff) and records project metadata.
+
+[project]
+name = "engram-memory"
+version = "1.0.0"
+description = "Persistent memory for Claude Code, built on a plain Obsidian vault."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+keywords = ["claude-code", "obsidian", "agent-memory", "llm", "hooks", "skills"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = [
+    "E501",   # long lines are fine in the docstrings/templates
+    "SIM105", # try/except/pass is intentional in the fail-open hook
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]  # path-loader import lives below a module docstring

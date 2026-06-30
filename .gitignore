@@ -1,0 +1,17 @@
+# Archiver backups (timestamped copies made before each --apply)
+*.bak
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+
+# Obsidian local UI state (if you drop Engram inside a real vault)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/workspaces.json
+.obsidian/cache/
+.trash/
+
+# Python
+__pycache__/
+*.pyc

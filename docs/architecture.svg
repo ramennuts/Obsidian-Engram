@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 460" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <style>
+    .card { fill: #ffffff; stroke: #c7d2fe; stroke-width: 1.5; }
+    .vault { fill: #eef2ff; stroke: #6366f1; stroke-width: 2; }
+    .file { fill: #ffffff; stroke: #a5b4fc; stroke-width: 1.2; }
+    .title { font-size: 15px; font-weight: 700; fill: #1e1b4b; }
+    .label { font-size: 13px; font-weight: 600; fill: #312e81; }
+    .sub { font-size: 11.5px; fill: #4b5563; }
+    .accent { font-size: 12px; font-weight: 700; fill: #4f46e5; }
+    .arrow { stroke: #6366f1; stroke-width: 2; fill: none; }
+    .arrowdim { stroke: #94a3b8; stroke-width: 1.8; fill: none; stroke-dasharray: 5 4; }
+  </style>
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#6366f1"/>
+    </marker>
+    <marker id="ahd" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="860" height="460" fill="none"/>
+  <text x="430" y="34" text-anchor="middle" class="title" font-size="18">Engram — the cross-session memory loop</text>
+
+  <!-- Session N (left) -->
+  <rect x="36" y="70" width="200" height="96" rx="12" class="card"/>
+  <text x="136" y="104" text-anchor="middle" class="label">Session N — ending</text>
+  <text x="136" y="128" text-anchor="middle" class="accent">/handoff</text>
+  <text x="136" y="148" text-anchor="middle" class="sub">writes a detailed handoff</text>
+
+  <!-- Vault (center) -->
+  <rect x="330" y="58" width="200" height="240" rx="14" class="vault"/>
+  <text x="430" y="86" text-anchor="middle" class="label">Obsidian vault</text>
+  <text x="430" y="104" text-anchor="middle" class="sub">plain markdown — no DB</text>
+  <rect x="350" y="120" width="160" height="42" rx="8" class="file"/>
+  <text x="430" y="139" text-anchor="middle" class="sub" font-weight="700">LIVE-STATE.md</text>
+  <text x="430" y="154" text-anchor="middle" class="sub">ground-truth board</text>
+  <rect x="350" y="172" width="160" height="42" rx="8" class="file"/>
+  <text x="430" y="191" text-anchor="middle" class="sub" font-weight="700">build-queue.md</text>
+  <text x="430" y="206" text-anchor="middle" class="sub">active / blocked work</text>
+  <rect x="350" y="224" width="160" height="42" rx="8" class="file"/>
+  <text x="430" y="243" text-anchor="middle" class="sub" font-weight="700">handoffs/</text>
+  <text x="430" y="258" text-anchor="middle" class="sub">dated pickup briefs</text>
+
+  <!-- Session N+1 (right) -->
+  <rect x="624" y="70" width="200" height="96" rx="12" class="card"/>
+  <text x="724" y="104" text-anchor="middle" class="label">Session N+1 — starting</text>
+  <text x="724" y="128" text-anchor="middle" class="accent">SessionStart hook</text>
+  <text x="724" y="148" text-anchor="middle" class="sub">injects a lean bootstrap</text>
+
+  <!-- Archiver (bottom) -->
+  <rect x="330" y="360" width="200" height="74" rx="12" class="card"/>
+  <text x="430" y="389" text-anchor="middle" class="label">Queue archiver</text>
+  <text x="430" y="409" text-anchor="middle" class="sub">weekly — keeps the queue</text>
+  <text x="430" y="424" text-anchor="middle" class="sub">lean so the inject stays sharp</text>
+
+  <!-- Arrows -->
+  <path class="arrow" d="M236,118 C 280,118 295,150 328,160" marker-end="url(#ah)"/>
+  <text x="262" y="108" class="sub" fill="#4f46e5" font-weight="700">write</text>
+
+  <path class="arrow" d="M532,160 C 565,150 580,118 622,118" marker-end="url(#ah)"/>
+  <text x="566" y="108" class="sub" fill="#4f46e5" font-weight="700">read</text>
+
+  <!-- loop-back: N+1 becomes the next N -->
+  <path class="arrowdim" d="M724,166 C 724,330 480,348 236,150" marker-end="url(#ahd)"/>
+  <text x="600" y="344" text-anchor="middle" class="sub">…the loop repeats — each session resumes grounded</text>
+
+  <!-- archiver maintains the queue -->
+  <path class="arrowdim" d="M430,358 L430,300" marker-end="url(#ahd)"/>
+  <text x="446" y="332" class="sub">prunes finished items</text>
+
+  <text x="430" y="452" text-anchor="middle" class="sub" fill="#6b7280">Read is automatic · Write is one command · The vault is the single source of truth</text>
+</svg>

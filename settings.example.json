@@ -1,0 +1,18 @@
+{
+  "//": "Engram hook registration for Claude Code. Merge the `hooks` block into your ~/.claude/settings.json (keep your existing hooks/permissions). Set ENGRAM_VAULT to your vault path, or edit the default at the top of each script.",
+  "env": {
+    "ENGRAM_VAULT": "/Users/you/vault"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/you/engram/hooks/session-start.py"
+          }
+        ]
+      }
+    ]
+  }
+}

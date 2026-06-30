@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e1b4b"/>
+      <stop offset="1" stop-color="#3730a3"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.06"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <!-- soft accent blobs -->
+  <circle cx="1180" cy="90" r="220" fill="#6366f1" opacity="0.18"/>
+  <circle cx="1120" cy="560" r="180" fill="#818cf8" opacity="0.12"/>
+
+  <!-- wordmark -->
+  <text x="90" y="190" font-size="104" font-weight="800" fill="#ffffff" letter-spacing="-2">Engram</text>
+  <text x="92" y="248" font-size="30" font-weight="600" fill="#c7d2fe">Persistent memory for Claude Code — built on a plain Obsidian vault.</text>
+
+  <!-- one-liner -->
+  <text x="92" y="312" font-size="23" fill="#a5b4fc">Resume any session with full context, instead of waking up amnesiac every time.</text>
+
+  <!-- feature chips -->
+  <g font-size="22" font-weight="700" fill="#e0e7ff">
+    <rect x="90"  y="356" width="232" height="58" rx="29" fill="url(#glass)" stroke="#6366f1" stroke-opacity="0.5"/>
+    <text x="206" y="393" text-anchor="middle">two memory layers</text>
+    <rect x="338" y="356" width="220" height="58" rx="29" fill="url(#glass)" stroke="#6366f1" stroke-opacity="0.5"/>
+    <text x="448" y="393" text-anchor="middle">no DB · no deps</text>
+    <rect x="574" y="356" width="170" height="58" rx="29" fill="url(#glass)" stroke="#6366f1" stroke-opacity="0.5"/>
+    <text x="659" y="393" text-anchor="middle">fail-open</text>
+  </g>
+
+  <!-- two-layer glyph (right) -->
+  <g transform="translate(840,300)">
+    <rect x="0" y="-150" width="350" height="120" rx="16" fill="url(#glass)" stroke="#a5b4fc" stroke-opacity="0.7"/>
+    <text x="24" y="-112" font-size="20" font-weight="700" fill="#ffffff">LAYER 1 · durable</text>
+    <text x="24" y="-80" font-size="17" fill="#c7d2fe">who you are · prefs · projects</text>
+    <text x="24" y="-54" font-size="15" fill="#a5b4fc" font-style="italic">always loaded</text>
+
+    <rect x="0" y="6" width="350" height="120" rx="16" fill="url(#glass)" stroke="#a5b4fc" stroke-opacity="0.7"/>
+    <text x="24" y="44" font-size="20" font-weight="700" fill="#ffffff">LAYER 2 · working</text>
+    <text x="24" y="76" font-size="17" fill="#c7d2fe">live state · queue · handoffs</text>
+    <text x="24" y="102" font-size="15" fill="#a5b4fc" font-style="italic">injected lean at start</text>
+  </g>
+
+  <!-- footer -->
+  <text x="92" y="566" font-size="22" font-weight="600" fill="#818cf8">github.com/ramennuts/Obsidian-Engram</text>
+  <text x="1190" y="566" text-anchor="end" font-size="20" fill="#6366f1">MIT · for Claude Code + Obsidian</text>
+</svg>

@@ -22,6 +22,11 @@ clear jobs (durable facts vs. live working state) and the tooling to keep both s
   <img src="docs/demo.gif" alt="Terminal demo: the doctor reports every check green, the SessionStart hook prints a lean bootstrap of current state, and the archiver keeps finished items while leaving still-live ones in place." width="94%">
 </p>
 
+> Built because I was tired of re-explaining my project to Claude Code every morning.
+> Engram is the setup that fixed it — and it's all plain files you can read and edit.
+
+**[Two layers](#two-layers-of-memory)** · **[Toolkit](#the-full-toolkit)** · **[Install](#install-5-minutes)** · **[Usage](#usage)** · **[Why not just…](#why-not-just)** · **[FAQ](#faq)** · **[Design notes](docs/design.md)**
+
 ---
 
 ## The idea
@@ -229,6 +234,12 @@ Inspired by [@kepano](https://github.com/kepano)'s
 [obsidian-skills](https://github.com/kepano/obsidian-skills) (great companion install
 for authoring Bases/Canvas/Markdown natively). Engram is the memory-loop layer:
 hooks + a handoff skill + a self-maintaining queue.
+
+## Star history
+
+If Engram saves you from re-explaining your work each session, a ⭐ helps others find it.
+
+[![Star History Chart](https://api.star-history.com/svg?repos=ramennuts/Obsidian-Engram&type=Date)](https://star-history.com/#ramennuts/Obsidian-Engram&Date)
 
 ## License
 

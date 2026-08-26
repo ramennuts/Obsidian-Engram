@@ -1,0 +1,3 @@
+{"id": "sample-fact", "layer": "memory-file", "question": "REPLACE ME: ask for a durable fact only your memory files hold.", "expect_all": ["REPLACE-WITH-DISTINCTIVE-TOKEN"]}
+{"id": "sample-rule", "layer": "claude-md", "question": "REPLACE ME: ask which standing rule applies to a scenario.", "expect_any": ["REPLACE-A", "REPLACE-B"]}
+{"id": "sample-capability", "layer": "capabilities", "question": "REPLACE ME: ask what tool/CLI handles a recurring job.", "expect_all": ["REPLACE-TOOL-NAME"]}

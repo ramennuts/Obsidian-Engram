@@ -69,3 +69,18 @@ unrelated work. For a single context, ignore scope entirely.
   the README. Save what was *non-obvious*.
 
 See `memory-template/` for filled-in examples of each type and a starter index.
+
+## v2 additions (2026-08-24)
+
+Optional note fields the tooling understands:
+
+```yaml
+verified: 2026-08-24        # last confirmed against the live system
+status: live | superseded    # INVALIDATE, don't delete (temporal-KG pattern):
+superseded_by: <slug>        #   a wrong fact gets marked + pointed forward,
+                             #   preserving the audit trail
+```
+
+Handoffs carry their own typed contract (`status`/`goal`/`next_action`/`topics`)
+— see `skills/handoff/SKILL.md`. `memory_lint.py --vault` enforces both, and
+`scripts/recall.py` searches everything either way.

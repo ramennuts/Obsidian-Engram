@@ -65,7 +65,10 @@ LIVE_RES = [re.compile(p, re.I) for p in (
 
 
 def find_section(content, header):
-    m = re.search(r"(?m)^" + re.escape(header) + r"[ \t]*$", content)
+    # Trailing text after the heading (e.g. "## Active items (43)") must still
+    # match: an exact-line match would silently no-op this now-daily unattended
+    # pass forever while the compactor logged it ok (board audit, LOW).
+    m = re.search(r"(?mi)^" + re.escape(header) + r"[ \t]*[^\n]*$", content)
     if not m:
         return None
     nxt = re.search(r"(?m)^## ", content[m.end():])
@@ -134,6 +137,7 @@ def main():
         return 1
     with open(args.file, encoding="utf-8") as f:
         content = f.read()
+    original = content   # freshness baseline for the pre-write gate below
 
     archive_all = []
     for src in SOURCE_HEADERS:
@@ -171,6 +175,18 @@ def main():
     if not args.apply:
         print("\n[archive] DRY-RUN — no file written. Re-run with --apply to commit.")
         return 0
+
+    # Freshness gate (board 2026-08-24): this script now ALSO runs unattended
+    # daily via the compactor. A concurrent session may have edited the queue
+    # while we computed from our snapshot — clobbering that edit would silently
+    # lose live work with no recoverable backup. Abort fail-open; the next run
+    # retries on a fresh snapshot. (A tiny check→replace race remains; the
+    # window is milliseconds vs the minutes-long compute window closed here.)
+    with open(args.file, encoding="utf-8") as f:
+        if f.read() != original:
+            print("[archive] ABORT — file changed while this run was computing "
+                  "(concurrent session edit). Nothing written; re-run to retry.")
+            return 0
 
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     bak = f"{args.file}.{stamp}.bak"

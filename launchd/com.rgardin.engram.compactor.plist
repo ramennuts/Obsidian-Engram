@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.rgardin.engram.compactor</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/python3</string>
+        <string>/Users/rgardin/tools/engram/scripts/compactor.py</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>ENGRAM_VAULT</key>
+        <string>/Users/rgardin/vault</string>
+        <key>ENGRAM_MEMORY</key>
+        <string>/Users/rgardin/memory</string>
+        <key>PATH</key>
+        <string>/Users/rgardin/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>5</integer>
+        <key>Minute</key>
+        <integer>15</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/rgardin/tools/engram/logs/compactor.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rgardin/tools/engram/logs/compactor.log</string>
+</dict>
+</plist>

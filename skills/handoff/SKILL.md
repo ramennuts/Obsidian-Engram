@@ -48,6 +48,13 @@ title: "Session handoff — <YYYY-MM-DD> (<clause> · <clause>)"
 type: session-handoff
 date: <YYYY-MM-DD>
 tags: [handoff, <topic>, ...]
+status: active | blocked | done   # REQUIRED (typed-handoff contract, 2026-08-24):
+                                  # active = thread continues; blocked = waiting on
+                                  # someone/something; done = fully closed, no pickup
+goal: <one sentence — what this session's thread is trying to achieve>
+next_action: <the ONE concrete step the next/sibling session should take>
+topics: [<kebab-topics, feed `recall` search>]
+do_not: [<approaches already tried and failed>]   # optional
 ---
 
 # Session handoff — <YYYY-MM-DD>
@@ -99,3 +106,8 @@ tags: [handoff, <topic>, ...]
 
 After writing, tell the user the exact path, a one-line summary, whether you updated
 LIVE-STATE, and confirm it will auto-load next session.
+
+Set `status` honestly: `done` ONLY if nothing remains on the thread. Concurrent
+same-day sessions receive your `status`/`goal`/`next_action` as an injected digest
+(Engram v2 sibling merge) — write those three fields for a sibling who has read
+nothing else. `memory_lint.py --vault` flags handoffs that skip the contract.

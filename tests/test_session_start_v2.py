@@ -214,7 +214,7 @@ class TestHookV2(unittest.TestCase):
         real = os.sys.stdin
         try:
             os.sys.stdin = _io.StringIO("not json{{{")
-            self.assertEqual(hook.read_hook_input(), ("startup", None))
+            self.assertEqual(hook.read_hook_input(), ("startup", None, None))
         finally:
             os.sys.stdin = real
 

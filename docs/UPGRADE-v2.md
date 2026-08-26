@@ -55,7 +55,7 @@ cd ~/tools/engram && python3 evals/run_evals.py --label post-cutover
 Compare the two scorecard runs. A drop in the context-only number means v2 is
 injecting *worse* context than v1 — roll back and investigate, don't push on.
 
-## Step 3 — Install the compactor (Shane, after step 2 has run for a day)
+## Step 3 — Install the compactor ✅ DONE 2026-08-25 (installed + supervised run, 6/6 passes)
 
 ```bash
 cp ~/tools/engram/launchd/com.rgardin.engram.compactor.plist ~/Library/LaunchAgents/
@@ -78,30 +78,22 @@ that actually reaches a human.
 the plist. Nothing it wrote is destructive — archived files move to
 `machine/archive/`, never delete.
 
-## Step 4 — PreCompact hook (Shane) — BLOCKED pending one check
+## Step 4 — PreCompact hook ✅ UNBLOCKED 2026-08-25 (one Shane step left)
 
-The board **blocked** registration until this is answered, because a silently
-dead checkpoint feature is worse than no checkpoint feature:
+The board blocked this pending *"does the harness pass the same `session_id` to
+PreCompact and to the following SessionStart(source=compact)?"* — because if it
+does not, the checkpoint is never found and the feature is dead on arrival,
+silently.
 
-> Does the harness pass the **same** `session_id` to `PreCompact` and to the
-> following `SessionStart(source=compact)`?
+**That question no longer gates anything.** The checkpoint now records the
+`transcript_path` as a second correlation key, and the reader matches on session
+id **OR** transcript path. It is correct either way, and it still refuses another
+session's checkpoint when neither key matches (3 regression tests in
+`tests/test_party_isolation.py::TestCheckpointDualKey`).
 
-If it issues a fresh id at compaction, `checkpoint_matches_session()` will never
-match, and the CHECKPOINT block is dead on arrival with no error. To check: add
-the hook, trigger one `/compact`, and compare the `session_id` written into the
-checkpoint filename under `~/vault/machine/checkpoints/` with the id the next
-SessionStart receives. If they differ, correlate on `transcript_path` instead
-before relying on it.
-
-Second, board-recommended precondition: the domain gate currently uses **cwd**,
-which the code itself documents as a proxy, not a proof. The authoritative signal
-is the per-session pin file that `file-guard` maintains — but that store is
-Shane-only (it blocked both the auditor and me from reading it, which is the guard
-working correctly). Wiring `pre-compact.py` to refuse when a pin file exists for
-this `session_id` is a Shane task, and it should fail closed.
-
-Registration, once both are settled — add to the `hooks` object of
-`~/.claude/settings.json`:
+All that remains is registration, which touches the Claude settings file — so it
+is yours. Unlock, add, re-lock (the D4 board's `apply-d4-setting.sh` shows the
+safe shape with an EXIT trap):
 
 ```json
 "PreCompact": [
@@ -110,8 +102,13 @@ Registration, once both are settled — add to the `hooks` object of
 ]
 ```
 
-The post-compaction re-arm (charter digest) works **without** this hook; the
-checkpoint only adds session-specific detail.
+Afterwards, `memory_lint --hooks` will report `HOOK-DRIFT` (the registration
+changed — the detector working). Re-baseline once:
+`python3 ~/tools/engram/scripts/memory_lint.py --update-hooks-baseline`.
+
+The post-compaction re-arm (charter digest) already works **without** this hook;
+the checkpoint only adds session-specific detail. The write is domain-gated, so a
+customer-pinned session writes no checkpoint at all.
 
 ## Step 5 — D4 (the two-memory-store split) — RESOLVED, ready to execute
 

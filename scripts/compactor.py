@@ -419,11 +419,16 @@ def _run_proposals(material, env, target, date, outcome):
     # (board audit ADDED-2). --strict-mcp-config drops inherited MCP servers,
     # so no pre-approved MCP write (e.g. a mail draft) is reachable. The deny
     # list stays as belt-and-braces. --max-turns works but is undocumented.
+    # PROMPT ON STDIN. `--tools` and `--disallowedTools` are VARIADIC and
+    # swallow a trailing positional prompt, so the CLI dies before any call is
+    # made. The evals had the identical bug; this call site did not get the same
+    # fix at the same time — the standing lesson, again. Caught by the alarm
+    # this job now has: exit 1 on the very first supervised run (2026-08-25).
     r = subprocess.run(
         ["claude", "-p", "--model", LLM_MODEL, "--output-format", "json",
-         "--max-turns", "1", "--tools", "", "--strict-mcp-config",
-         "--disallowedTools", "Bash,Write,Edit,NotebookEdit,Task,Agent,WebFetch",
-         LLM_PROMPT + material],
+         "--max-turns", "1", "--strict-mcp-config", "--tools", "",
+         "--disallowedTools", "Bash,Write,Edit,NotebookEdit,Task,Agent,WebFetch"],
+        input=LLM_PROMPT + material,
         capture_output=True, text=True, timeout=300, env=env)
     if r.returncode != 0:
         outcome["outcome"] = f"cli-exit-{r.returncode}"

@@ -102,8 +102,13 @@ def main():
     sid = re.sub(r"[^A-Za-z0-9]", "", str(data.get("session_id", "unknown")))[:8] or "unknown"
     path = os.path.join(CHECKPOINT_DIR,
                         f"{now.strftime('%Y-%m-%d-%H%M')}-{sid}-precompact.md")
+    # Record the transcript path as a SECOND correlation key. The board blocked
+    # registration pending "does the harness reuse session_id across
+    # compaction?" — that question dissolves if the reader can match on either.
+    tpath = str(data.get("transcript_path") or "")
     lines = [
         f"# Pre-compact checkpoint — {now.strftime('%Y-%m-%d %H:%M')}",
+        f"<!-- transcript: {tpath} -->",
         f"- session: {sid} · trigger: {data.get('trigger', '?')} · cwd: "
         f"{os.getcwd().replace(os.path.expanduser('~'), '~')}",
         "- Context was compacted after this point. Re-read the active queue "

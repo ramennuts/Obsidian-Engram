@@ -307,3 +307,51 @@ class TestLintIdentityHygiene(Base):
         found = "\n".join(self._lint().lint_vault(self.vault))
         self.assertIn("OLD-BACKUP", found,
                       "nested + date-suffixed backups were invisible before")
+
+
+class TestCheckpointDualKey(Base):
+    """The board blocked PreCompact registration pending 'does the harness reuse
+    session_id across compaction?' — if it does not, an id-only lookup silently
+    never fires. Matching on session id OR transcript path makes the feature
+    correct either way, so the empirical check is no longer a precondition."""
+
+    def _hook(self):
+        return conftest_paths.load("hooks/session_start_v2.py", "ckpt_hook")
+
+    def _checkpoint(self, sid8, transcript, body):
+        d = os.path.join(self.vault, "machine", "checkpoints")
+        os.makedirs(d, exist_ok=True)
+        self._w(os.path.join(d, f"2026-08-25-1200-{sid8}-precompact.md"),
+                f"# cp\n<!-- transcript: {transcript} -->\n{body}\n")
+
+    def _charter(self, h):
+        root = os.path.join(self.root, "dotclaude")
+        os.makedirs(root, exist_ok=True)
+        self._w(os.path.join(root, "CLAUDE.md"), "## Operating principles\n1. r.\n")
+        h.CLAUDE_ROOT, h.CLAUDE_MD = root, os.path.join(root, "CLAUDE.md")
+
+    def test_matches_on_session_id(self):
+        h = self._hook()
+        self._charter(h)
+        self._checkpoint("aaaa1111", "/t/a.jsonl", "IDMATCHMARK")
+        ctx, _ = h.assemble("compact", session_id="aaaa1111-rest")
+        self.assertIn("IDMATCHMARK", ctx)
+
+    def test_matches_on_transcript_when_the_session_id_CHANGED(self):
+        """The exact scenario the board was worried about."""
+        h = self._hook()
+        self._charter(h)
+        self._checkpoint("aaaa1111", "/t/a.jsonl", "TRANSCRIPTMARK")
+        ctx, _ = h.assemble("compact", session_id="zzzz9999-different",
+                            transcript_path="/t/a.jsonl")
+        self.assertIn("TRANSCRIPTMARK", ctx,
+                      "a fresh session_id must not orphan the checkpoint")
+
+    def test_still_refuses_another_sessions_checkpoint(self):
+        h = self._hook()
+        self._charter(h)
+        self._checkpoint("bbbb2222", "/t/other.jsonl", "OTHERSESSIONLEAK")
+        ctx, _ = h.assemble("compact", session_id="aaaa1111-mine",
+                            transcript_path="/t/mine.jsonl")
+        self.assertNotIn("OTHERSESSIONLEAK", ctx or "",
+                         "neither key matches — must inject nothing")

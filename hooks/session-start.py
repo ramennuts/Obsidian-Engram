@@ -741,25 +741,41 @@ def session_key(session_id):
     return re.sub(r"[^A-Za-z0-9]", "", str(session_id))[:8] or "unknown"
 
 
-def checkpoint_matches_session(session_id):
+def _checkpoint_transcript(path):
+    """The transcript path recorded inside a checkpoint, or ""."""
+    try:
+        m = re.search(r"<!-- transcript: (.*?) -->", read_text(path))
+        return m.group(1).strip() if m else ""
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def checkpoint_matches_session(session_id, transcript_path=None):
     """The newest checkpoint stamped with THIS session's id, or None. Concurrent
     sessions compact too — the globally-newest checkpoint may be another
     session's in-flight state (board 2026-08-24, finding B2 — proven with a
     canary). No id, or no matching file → inject nothing; never fall back to
     an unscoped 'most recent'."""
-    if not session_id:
+    if not session_id and not transcript_path:
         return None
     # MUST match pre-compact.py's key exactly: it sanitizes THEN truncates. The
     # two hooks agreed only by luck on UUID-shaped ids; any other id shape meant
     # the checkpoint was never found — silently, forever — and a glob
     # metacharacter surviving into the pattern could match ANOTHER session's
     # file, partially re-opening B2 (chair C3).
-    sid8 = session_key(session_id)
+    # Match on session id OR transcript path. If the harness issues a FRESH
+    # session_id at compaction, an id-only match silently never fires — the
+    # dead-on-arrival risk the board blocked registration over. A second key
+    # makes the feature correct either way, so the empirical check stops being
+    # a precondition (2026-08-25).
     try:
+        cands = [p for p in glob.glob(os.path.join(CHECKPOINT_DIR, "*-precompact.md"))
+                 if contained(p)]
+        sid8 = session_key(session_id) if session_id else None
         files = sorted(
-            (p for p in glob.glob(os.path.join(CHECKPOINT_DIR,
-                                               f"*-{sid8}-precompact.md"))
-             if contained(p)),
+            (p for p in cands
+             if (sid8 and f"-{sid8}-precompact.md" in os.path.basename(p))
+             or (transcript_path and _checkpoint_transcript(p) == transcript_path)),
             key=os.path.getmtime, reverse=True)
     except OSError:
         return None
@@ -781,20 +797,20 @@ def read_hook_input():
     Anything unreadable → ("startup", None), fail-open."""
     try:
         if sys.stdin.isatty():
-            return "startup", None
+            return "startup", None, None
         import select
         ready, _, _ = select.select([sys.stdin], [], [], 2.0)
         if not ready:
-            return "startup", None
+            return "startup", None, None
         raw = sys.stdin.read()
         if not raw.strip():
-            return "startup", None
+            return "startup", None, None
         data = json.loads(raw)
-        sid = data.get("session_id")
+        sid, tp = data.get("session_id"), data.get("transcript_path")
         return (str(data.get("source", "startup")).lower(),
-                str(sid) if sid else None)
+                str(sid) if sid else None, str(tp) if tp else None)
     except Exception:
-        return "startup", None
+        return "startup", None, None
 
 
 def metrics_append(source, blocks, size, mode="session"):
@@ -836,7 +852,7 @@ REARM_HEADER = (
 )
 
 
-def assemble(source, session_id=None):
+def assemble(source, session_id=None, transcript_path=None):
     """Build (context, block_names) for this source, or (None, []) to inject
     nothing. Priority-drop keeps the total under SAFE_TOTAL: capabilities go
     first, then the sibling-digest block is dropped AND its siblings fall back
@@ -850,7 +866,8 @@ def assemble(source, session_id=None):
         parts = []
         for label, fn in (("▶ CHARTER — operating principles", charter_block),
                           ("▶ CHECKPOINT — pre-compact state",
-                           lambda: checkpoint_matches_session(session_id))):
+                           lambda: checkpoint_matches_session(
+                               session_id, transcript_path))):
             try:
                 body = fn()
             except Exception:
@@ -928,8 +945,9 @@ def main():
     if os.environ.get("ENGRAM_SKIP"):
         sys.exit(0)
     shadow = "--shadow" in sys.argv
-    source, session_id = ("startup", None) if shadow else read_hook_input()
-    ctx, block_names = assemble(source, session_id)
+    source, session_id, tpath = (("startup", None, None) if shadow
+                                 else read_hook_input())
+    ctx, block_names = assemble(source, session_id, tpath)
     if not ctx:
         return
     if shadow:

@@ -12,14 +12,14 @@ Claude by design.
 
 ## Before you start — the one-line state of play
 
-The registered `SessionStart` hook is still **v1** (`hooks/session-start.py`,
-unchanged and committed). v2 lives beside it as `hooks/session_start_v2.py` and
-has never run in a real session — only via `--shadow`. Rollback at every stage is
-"don't cut over" or one `git checkout`.
+**CUT OVER 2026-08-25.** `hooks/session-start.py` now holds v2's content and is
+what every new session gets. Rollback is one command:
+`git -C ~/tools/engram checkout 523002e -- hooks/session-start.py`
+(523002e is the pre-cutover checkpoint commit).
 
 ---
 
-## Step 1 — Baseline the evals BEFORE anything changes (Claude-runnable)
+## Step 1 — Baseline the evals BEFORE anything changes ✅ DONE 2026-08-25 (10/12; context-only 7/9)
 
 ```bash
 cd ~/tools/engram && python3 evals/run_evals.py --label pre-cutover
@@ -34,7 +34,7 @@ Read the **context-only** number, not the total: those probes run with `--tools 
 and can only be answered from injected context. That number is the one that
 measures the bootstrap.
 
-## Step 2 — Cut over the hook (Claude-runnable, reversible)
+## Step 2 — Cut over the hook ✅ DONE 2026-08-25 (commit 523002e; post-cutover 11/12, context-only **9/9**)
 
 ```bash
 cd ~/tools/engram && git add -A && git commit -m "Engram v2: pre-cutover checkpoint"

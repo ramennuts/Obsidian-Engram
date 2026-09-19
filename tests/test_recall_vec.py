@@ -190,6 +190,15 @@ class TestLeaseAndRebuild(Base):
         self.rv.inline_update(self.recall.DB, self.recall.VDB, self.model, embedder_factory=Fake)
         self.assertTrue(self.rv._take_lease(self.recall.VDB))
 
+    def test_releasing_never_frees_another_sessions_lease(self):
+        self._docs(1)
+        self.recall.index(rebuild=True)
+        mine = self.rv._take_lease(self.recall.VDB, now=time.time() - 3600)   # expired
+        theirs = self.rv._take_lease(self.recall.VDB)                        # taken over
+        self.assertIsNotNone(theirs)
+        self.rv._drop_lease(self.recall.VDB, mine)
+        self.assertIsNone(self.rv._take_lease(self.recall.VDB), "their lease must survive")
+
     def test_a_rebuild_still_purges_vectors_of_a_deleted_doc(self):
         """Follow-up 4: `known` was read after the rebuild's DELETE, so a doc
         deleted in that window never registered as gone."""

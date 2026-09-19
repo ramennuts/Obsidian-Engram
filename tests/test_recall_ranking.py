@@ -38,6 +38,9 @@ class Base(unittest.TestCase):
         for k, v in env.items():
             os.environ[k] = v
         r = conftest_paths.load("scripts/recall.py", "rank_recall")
+        # A hung stub must FAIL fast, not quietly add 60 s to a passing suite
+        # (the intermittent +60 s runs; chair 2026-09-19).
+        r.SIDECAR_TIMEOUT = 5
         r.index(rebuild=True)
         return r
 
@@ -374,7 +377,7 @@ class TestVectorFusion(Base):
         stats = {}
         rows, _ = r.search("VECMARK", stats=stats)
         self.assertEqual([os.path.basename(p) for p, *_ in rows], ["kw.md"])
-        self.assertTrue(stats["vectors"].startswith("unavailable"))
+        self.assertTrue(stats["vectors"].startswith("unavailable (RuntimeError"), stats)
 
     def test_garbage_output_fails_open_too(self):
         self._docs()
@@ -384,7 +387,20 @@ class TestVectorFusion(Base):
         stats = {}
         rows, _ = r.search("VECMARK", stats=stats)
         self.assertEqual(len(rows), 1)
-        self.assertTrue(stats["vectors"].startswith("unavailable"))
+        self.assertTrue(stats["vectors"].startswith("unavailable (JSONDecodeError"), stats)
+
+    def test_a_hung_sidecar_times_out_and_says_so(self):
+        import time
+        self._docs()
+        env = self._stub({})
+        self._w(env["ENGRAM_RECALL_SIDECAR"], "import time\ntime.sleep(30)\n")
+        r = self._recall(**env)
+        r.SIDECAR_TIMEOUT = 1
+        stats, t = {}, time.monotonic()
+        rows, _ = r.search("VECMARK", stats=stats)
+        self.assertLess(time.monotonic() - t, 10)
+        self.assertEqual(len(rows), 1, "fail-open: keyword results still come back")
+        self.assertIn("timed out", stats["vectors"])
 
 
 class TestSchemaUpgrade(Base):

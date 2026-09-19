@@ -68,7 +68,8 @@ def recall_health(vault=None, now=None):
                 else f"no usage log yet; index last refreshed {days:.0f} day(s) ago",
                 "nothing is searching past work: sessions should run recall before "
                 "re-deriving it (the bootstrap teaches this)"))
-    embed_py = os.path.expanduser("~/.cache/engram-embed/venv/bin/python")
+    embed_py = os.environ.get("ENGRAM_EMBED_PY",
+                              os.path.expanduser("~/.cache/engram-embed/venv/bin/python"))
     if not os.path.isfile(vdb):
         out.append(("recall meaning search (optional)", "warn", "not installed; keyword only",
                     "scripts/install_recall_vectors.sh, then recall.py --rebuild-vectors"))

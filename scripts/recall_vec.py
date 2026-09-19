@@ -207,9 +207,10 @@ def update(db, vdb, model_dir, emb=None, rebuild=False, budget=None, busy_ms=150
 
 
 def _take_lease(vdb, now=None):
-    """True if this search may do the inline catch-up. Two sessions used to
-    each burn every core for 15 s on the SAME backlog (board 2026-09-19
-    follow-up 1). An expired lease (a killed holder) is simply taken over."""
+    """A lease token if this search may do the inline catch-up, else None.
+    Two sessions used to each burn every core for 15 s on the SAME backlog
+    (board 2026-09-19 follow-up 1). An expired lease (a killed holder) is
+    simply taken over."""
     now = time.time() if now is None else now
     con = _vcon(vdb, SEARCH_BUSY_MS)
     got = []
@@ -218,19 +219,22 @@ def _take_lease(vdb, now=None):
         row = con.execute("SELECT v FROM meta WHERE k='lease'").fetchone()
         if row and float(row[0]) > now:
             return
-        con.execute("INSERT OR REPLACE INTO meta VALUES('lease', ?)", (str(now + LEASE_S),))
-        got.append(True)
+        token = repr(now + LEASE_S)
+        con.execute("INSERT OR REPLACE INTO meta VALUES('lease', ?)", (token,))
+        got.append(token)
     try:
         _write(con, claim)
     finally:
         con.close()
-    return bool(got)
+    return got[0] if got else None
 
 
-def _drop_lease(vdb):
+def _drop_lease(vdb, token):
+    """Release ONLY our own lease: if it expired and another session took it
+    over, deleting by key alone would free theirs too (chair follow-up)."""
     con = _vcon(vdb, SEARCH_BUSY_MS)
     try:
-        _write(con, lambda: con.execute("DELETE FROM meta WHERE k='lease'"))
+        _write(con, lambda: con.execute("DELETE FROM meta WHERE k='lease' AND v=?", (token,)))
     finally:
         con.close()
 
@@ -239,14 +243,15 @@ def inline_update(db, vdb, model_dir, emb=None, embedder_factory=None):
     """(embedded, not_embedded, busy). busy=True: another session holds the
     lease, so this search reads what's stored (recall's mtime check drops
     anything out of date) and doesn't embed."""
-    if not _take_lease(vdb):
+    token = _take_lease(vdb)
+    if token is None:
         return 0, 0, True
     try:
         n, left = update(db, vdb, model_dir, emb=emb, budget=INLINE_BUDGET_S,
                          busy_ms=SEARCH_BUSY_MS, embedder_factory=embedder_factory)
         return n, left, False
     finally:
-        _drop_lease(vdb)
+        _drop_lease(vdb, token)
 
 
 def search(db, vdb, model_dir, query):

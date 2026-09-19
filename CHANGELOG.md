@@ -35,6 +35,19 @@ All notable changes to Engram are documented here. Format follows
 - `--party` takes exactly one registered slug (a comma-joined value exposed a
   two-party doc; board 2026-09-19).
 - Index schema 3 (adds `links`); an older cache rebuilds itself.
+- **Best-match party warning**: the loud ⚠ now fires only when a HIDDEN
+  client/prospect doc would be the #1 match (measured: 5/80 internal
+  questions vs 7/8 party questions asked unscoped); the per-doc count is a
+  quiet ℹ line (it fired on 92% of ordinary questions).
+- The bootstrap teach-line says WHEN to run `recall` (before answering "have
+  we done / decided / where is X?"), not just that it exists.
+
+### Added (follow-ups)
+- `recall` logs one line per search to `machine/metrics/recall-usage.jsonl`
+  (counts only, never the query); `doctor.py` reports recall usage from that
+  log plus meaning-search install/catch-up health.
+- Inline-embed lease: one session catches the vector index up at a time; the
+  others read what's stored.
 
 ### Fixed
 - **`recall` filtered AFTER its `LIMIT limit*6` cut**, so eligible docs ranked
@@ -46,6 +59,8 @@ All notable changes to Engram are documented here. Format follows
   query starting with `-` could inject sidecar options; the installer claimed
   "verified" on macOS bash 3.2 without checking. All fixed with tests that run
   the real `update()` in stdlib CI.
+- `index(rebuild=True)` read the known-docs list after clearing it, so a doc
+  deleted before a rebuild kept its vectors until the next meaning search.
 
 - **`memory_lint.py --projects`** — the D4 stray-auto-memory detector
   (board 2026-08-24, `machine/memory-v2/board-2026-08-24-d4/`). Stat-only scan of

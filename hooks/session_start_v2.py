@@ -49,9 +49,10 @@ MANIFEST = os.path.join(VAULT, "machine", "capability-manifest.md")
 LINT_REPORT = os.path.join(VAULT, "machine", "memory-v2", "lint-report-latest.md")
 CHECKPOINT_DIR = os.path.join(VAULT, "machine", "checkpoints")
 METRICS = os.path.join(VAULT, "machine", "metrics", "bootstrap-sizes.jsonl")
-RECALL_LINE = ("Search past work/decisions cheaply: "
-               "`python3 ~/tools/engram/scripts/recall.py \"<query>\"` "
-               "(FTS over vault+memory; `--capabilities` lists tools/skills).")
+RECALL_LINE = ("BEFORE answering \"have we done / decided / where is X?\" or re-deriving "
+               "past work, run `python3 ~/tools/engram/scripts/recall.py \"<the question>\"`: "
+               "keyword + meaning search over vault+memory that says when there is NO record "
+               "(`--capabilities` lists tools/skills).")
 
 # Handoff `##` sections injected in full (the actionable ones). Substring match.
 HANDOFF_FULL = ["Open items", "Next steps", "Resume", "Pending decisions"]

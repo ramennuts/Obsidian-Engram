@@ -18,6 +18,7 @@ __pycache__/
 
 # Local, machine-specific eval answer keys (sensitive facts — public repo)
 evals/probes.local.jsonl
+evals/*.local.jsonl
 
 # Runtime logs (may quote vault-derived text)
 logs/

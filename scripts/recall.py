@@ -18,17 +18,47 @@ tests/test_recall.py.
   recall.py --topics sow --since 2026-08-01 "pricing"
   recall.py --capabilities          # print the capability manifest digest
   recall.py --rebuild               # drop + rebuild the index from scratch
+
+RANKING (retrieval review 2026-09-19, patterns taken from NornicDB) —
+  1. every filter (party / topic / date / stale) runs INSIDE the SQL, before
+     any top-K cut; filtering after a LIMIT silently dropped eligible docs;
+  2. OR-matched BM25; the old AND-of-every-word matching found almost
+     nothing for a plain question. Title/tag weights are plumbed but left
+     equal: no setting beat equal weights on both eval halves;
+  3. optional meaning search from a LOCAL embedding sidecar (recall_vec.py),
+     fused with BM25 by Reciprocal Rank Fusion (k=60); FAIL-OPEN, so any
+     sidecar problem degrades to BM25 alone and says so;
+  4. docs whose status says SUPERSEDED/OBSOLETE/ARCHIVED (or that live in an
+     archive/ folder) are hidden unless --include-stale: hidden, never deleted.
+     A time-decay prior was built and MEASURED OUT: no setting helped
+     "latest status" questions without costing keyword/scoped ones;
+  5. 1-hop [[wikilink]] neighbours of each hit, behind the same filters.
+Each change above was kept only if evals/run_retrieval.py showed a gain on
+BOTH halves of the question set; see docs/RECALL-VECTORS.md for numbers.
 """
 import argparse
 import hashlib
+import json
+import math
 import os
 import re
 import sqlite3
+import subprocess
 import sys
 
 VAULT = os.environ.get("ENGRAM_VAULT", os.path.expanduser("~/vault"))
 MEMORY = os.environ.get("ENGRAM_MEMORY", os.path.expanduser("~/memory"))
 DB = os.path.join(VAULT, ".recall", "index.db")
+VDB = os.path.join(VAULT, ".recall", "vectors.db")
+_EMBED_HOME = os.path.expanduser("~/.cache/engram-embed")
+EMBED_PY = os.environ.get("ENGRAM_EMBED_PY", os.path.join(_EMBED_HOME, "venv", "bin", "python"))
+EMBED_MODEL = os.environ.get("ENGRAM_EMBED_MODEL",
+                             os.path.join(_EMBED_HOME, "bge-small-en-v1.5"))
+SIDECAR = os.environ.get("ENGRAM_RECALL_SIDECAR",
+                         os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                      "recall_vec.py"))
+SIDECAR_TIMEOUT = 60
+SCHEMA = "3"                           # bump → the disposable cache rebuilds
 MANIFEST = os.path.join(VAULT, "machine", "capability-manifest.md")
 ALLOW_ROOTS = [VAULT, MEMORY]          # the ONLY trees ever indexed
 SKIP_DIRS = {".git", ".obsidian", ".trash", ".recall", "node_modules",
@@ -136,7 +166,37 @@ def _connect():
         party TEXT DEFAULT '')""")
     con.execute("""CREATE VIRTUAL TABLE IF NOT EXISTS docs_fts USING fts5(
         path UNINDEXED, title, tags, body, tokenize='porter unicode61')""")
+    con.execute("CREATE TABLE IF NOT EXISTS links(src TEXT, dst TEXT)")
+    con.execute("CREATE INDEX IF NOT EXISTS links_src ON links(src)")
+    con.execute("CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT)")
+    con.create_function("is_stale", 2, _is_stale, deterministic=True)
     return con
+
+
+# Status lines on this vault are free prose ("⛔ SUPERSEDED 2026-08-25, DO NOT
+# SEND…"), so match the LEADING word only; a status that merely mentions an
+# earlier superseded draft further along must not hide the current doc.
+_STALE_RE = re.compile(r"^[\W_]*(superseded|obsolete|archived|deprecated)\b", re.I)
+
+
+def _is_stale(status, path):
+    return int(bool(_STALE_RE.match(status or ""))
+               or f"{os.sep}archive{os.sep}" in (path or ""))
+
+
+# [[wikilink]] / [[path/name|alias]] and [text](file.md) — resolved by basename.
+_LINK_RE = re.compile(r"\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]|\]\(([^)\s#]+\.md)\)")
+
+
+def _link_names(text):
+    out = set()
+    for a, b in _LINK_RE.findall(text):
+        name = os.path.basename((a or b).strip())
+        if name.lower().endswith(".md"):
+            name = name[:-3]
+        if name:
+            out.add(name.lower())
+    return out
 
 
 def _walk():
@@ -194,18 +254,24 @@ def index(rebuild=False, verbose=False):
     # this a newly-registered party gets ZERO suppression on all existing
     # content — silently (verification round).
     fp = _registry_fingerprint(registry)
-    con.execute("CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT)")
     row = con.execute("SELECT v FROM meta WHERE k='registry_fp'").fetchone()
     if row and row[0] != fp:
         rebuild = True
         if verbose:
             print("[recall] registry changed — full retag")
     con.execute("INSERT OR REPLACE INTO meta VALUES('registry_fp', ?)", (fp,))
+    # A new column/table only fills as files change; an older cache would serve
+    # half-populated links forever. Schema change → rebuild the disposable cache.
+    row = con.execute("SELECT v FROM meta WHERE k='schema'").fetchone()
+    if not row or row[0] != SCHEMA:
+        rebuild = True
+    con.execute("INSERT OR REPLACE INTO meta VALUES('schema', ?)", (SCHEMA,))
     if rebuild:
         con.execute("DELETE FROM docs")
         con.execute("DELETE FROM docs_fts")
+        con.execute("DELETE FROM links")
     known = dict(con.execute("SELECT path, mtime FROM docs"))
-    seen, added = set(), 0
+    seen, added, removed = set(), 0, []
     for path in _walk():
         seen.add(path)
         try:
@@ -215,8 +281,10 @@ def index(rebuild=False, verbose=False):
         if st.st_size > MAX_DOC_BYTES:
             # Honestly absent beats confidently stale: a doc that GREW past the
             # cap must drop out of results, not serve its old snapshot forever.
+            removed.append(path)
             con.execute("DELETE FROM docs WHERE path=?", (path,))
             con.execute("DELETE FROM docs_fts WHERE path=?", (path,))
+            con.execute("DELETE FROM links WHERE src=?", (path,))
             continue
         if not rebuild and known.get(path) == st.st_mtime:
             continue
@@ -233,12 +301,17 @@ def index(rebuild=False, verbose=False):
                      tags, party))
         con.execute("INSERT INTO docs_fts(path,title,tags,body) VALUES(?,?,?,?)",
                     (path, title, tags, text))
+        con.execute("DELETE FROM links WHERE src=?", (path,))
+        con.executemany("INSERT INTO links VALUES(?,?)",
+                        [(path, n) for n in _link_names(text)])
         added += 1
     gone = set(known) - seen
     for path in gone:
         con.execute("DELETE FROM docs WHERE path=?", (path,))
         con.execute("DELETE FROM docs_fts WHERE path=?", (path,))
+        con.execute("DELETE FROM links WHERE src=?", (path,))
     con.commit()
+    _purge_vectors(removed + sorted(gone))
     n = con.execute("SELECT COUNT(*) FROM docs").fetchone()[0]
     if verbose:
         print(f"[recall] indexed {n} docs (+{added}, -{len(gone)}) at {DB}")
@@ -246,16 +319,149 @@ def index(rebuild=False, verbose=False):
     return n
 
 
-def _fts_quote(query):
+# Only used in OR mode, where a bare "the"/"what" would match every doc.
+_STOP = frozenset("""a an and are as at be but by can could did do does for from had has
+have how i if in into is it its me my of on or our should so than that the their them then
+there these they this to was we were what when where which who why will with would you
+your yet now actually just still""".split())
+
+
+def _purge_vectors(paths):
+    """A doc leaving the index must not leave its chunk text in vectors.db
+    until some later meaning search happens to run (board 2026-09-19 1(iv)).
+    Best-effort and brief: search()'s mtime check covers a miss."""
+    if not paths or not os.path.exists(VDB):
+        return
+    try:
+        vc = sqlite3.connect(VDB, timeout=2)
+        vc.executemany("DELETE FROM chunks WHERE path=?", [(p,) for p in paths])
+        vc.commit()
+        vc.close()
+    except sqlite3.Error:
+        pass
+
+
+def _fts_quote(query, match="or"):
     """Treat the query as plain words, not FTS syntax — quote each term so
-    hyphens/apostrophes in normal prose can't raise fts5 syntax errors."""
+    hyphens/apostrophes in normal prose can't raise fts5 syntax errors.
+
+    match="or" (default): any term may match and BM25 ranks docs holding more
+    (and rarer) terms higher, which is standard BM25. match="and" requires
+    every word, so a natural-language question matched almost nothing:
+    paraphrase Hit@5 was 0.03 on the 2026-09-19 eval."""
     terms = re.findall(r"\w+", query)
-    return " ".join(f'"{t}"' for t in terms) if terms else '""'
+    if match == "or":
+        kept = [t for t in terms if t.lower() not in _STOP]
+        terms = kept or terms
+    if not terms:
+        return '""'
+    return (" OR " if match == "or" else " ").join(f'"{t}"' for t in terms)
+
+
+# ── ranking knobs (set from evals/run_retrieval.py; see RANKING above) ──────
+BM25_WEIGHTS = (1.0, 1.0, 1.0)       # title, tags, body; see evals --sweep
+RRF_K = 60.0                         # NornicDB / Cormack et al. default
+VECTOR_WEIGHT = 1.0
+BM25_WEIGHT = 1.0
+
+
+def _candidates(limit):
+    return max(limit * 2, 20)
+
+
+def _filters(party, all_parties, topics, since, include_stale):
+    """SQL predicates over `docs d`. EVERY caller applies these before choosing
+    top-K. Party clause first; the others are split out so the suppressed
+    count can report only docs hidden by isolation."""
+    party_sql, party_p = "1", []
+    if party and "," in party:
+        # A comma-joined scope would string-equal a TWO-party doc's tag and
+        # expose it (board 2026-09-19 AUDIT-A #2). One party per scope.
+        raise ValueError(f"--party takes ONE slug, got {party!r}")
+    if not all_parties:
+        # d.party is a sorted comma-joined SET. Keep it only when it is empty or
+        # exactly the caller's single scope; a two-party doc never matches one
+        # slug, so the OTHER party's content stays suppressed.
+        party_sql, party_p = "(COALESCE(d.party,'')='' OR d.party=?)", [party or ""]
+    rest, rest_p = [], []
+    if topics:
+        rest.append("(instr(lower(COALESCE(d.tags,'')), ?)>0 OR instr(lower(d.path), ?)>0)")
+        rest_p += [topics.lower(), topics.lower()]
+    if since:
+        rest.append("(COALESCE(d.date,'')!='' AND d.date>=?)")
+        rest_p.append(since)
+    stale_sql = "1" if include_stale else "is_stale(d.status, d.path)=0"
+    return (party_sql, party_p, " AND ".join(rest) or "1", rest_p, stale_sql)
+
+
+def _vector_ranks(query, stats):
+    """[(path, sim, excerpt, chunk_mtime)] for EVERY embedded doc, best first,
+    or None.
+    Fail-open: a missing sidecar, a crash, a timeout or bad JSON all return
+    None, and BM25 carries the search alone."""
+    if os.environ.get("ENGRAM_RECALL_VECTORS", "1") == "0":
+        stats["vectors"] = "off"
+        return None
+    if not (os.path.exists(EMBED_PY) and os.path.isdir(EMBED_MODEL)
+            and os.path.exists(SIDECAR)):
+        # Silent only where it was never installed. If vectors.db exists, the
+        # sidecar WAS here and vanished (e.g. a uv upgrade broke the venv
+        # symlink): that degradation must be announced (board 5).
+        stats["vectors"] = "missing" if os.path.exists(VDB) else "not installed"
+        return None
+    try:
+        p = subprocess.run([EMBED_PY, SIDECAR, "search", "--db", DB, "--vdb", VDB,
+                            "--model", EMBED_MODEL, "--", query],
+                           capture_output=True, text=True, timeout=SIDECAR_TIMEOUT)
+        if p.returncode != 0:
+            lines = (p.stderr or "").strip().splitlines()
+            raise RuntimeError(lines[-1] if lines else "exit != 0")
+        out = json.loads(p.stdout)
+        stats["vectors"] = "on"
+        if out.get("stale"):
+            stats["vectors"] = f"on ({out['stale']} docs not yet embedded)"
+        return [(r[0], r[1], r[2], r[3]) for r in out.get("results", [])]
+    except subprocess.TimeoutExpired:
+        stats["vectors"] = ("unavailable (timed out; run `recall.py --rebuild-vectors` "
+                            "to catch the vector index up)")
+        return None
+    except Exception as e:           # noqa: BLE001 — fail-open is the contract
+        stats["vectors"] = f"unavailable ({type(e).__name__}: {str(e)[:120]})"
+        return None
+
+
+def related(paths, party=None, all_parties=False, include_stale=False, per_hit=3):
+    """{path: [linked doc paths]}: 1-hop wikilink neighbours behind the SAME
+    party/stale filters as search results, so a link can never become a side
+    door into another party's documents."""
+    if not paths:
+        return {}
+    con = _connect()
+    psql, pp, _r, _rp, ssql = _filters(party, all_parties, None, None, include_stale)
+    by_name = {}
+    for (p,) in con.execute(f"SELECT d.path FROM docs d WHERE {psql} AND {ssql}", pp):
+        by_name.setdefault(os.path.basename(p)[:-3].lower(), []).append(p)
+    out = {}
+    for src in paths:
+        names = sorted(r[0] for r in con.execute("SELECT dst FROM links WHERE src=?", (src,)))
+        hits = [p for n in names for p in by_name.get(n, []) if p != src]
+        if hits:
+            out[src] = hits[:per_hit]
+    con.close()
+    return out
 
 
 def search(query, topics=None, since=None, limit=8, party=None,
-           all_parties=False):
-    """(rows, suppressed_count).
+           all_parties=False, include_stale=False, vectors=None, stats=None,
+           weights=None, match="or"):
+    """(rows, suppressed_count). `stats`, if a dict, receives diagnostics:
+    stale_hidden, vectors (on / off / unavailable…). `vectors` None = auto.
+    `weights` / `match` exist for evals/run_retrieval.py.
+
+    Filters run BEFORE the top-K cut (they used to run after `LIMIT limit*6`,
+    which silently dropped eligible docs ranked below the cut: measured
+    2026-09-19, `recall SOW` returned 6 of 8 while 16 eligible docs existed).
+    Suppressed = keyword matches hidden ONLY by party isolation.
 
     By DEFAULT a result belonging to a client/prospect party is suppressed, and
     the count is reported. Cross-party exposure becomes a deliberate keystroke
@@ -267,34 +473,96 @@ def search(query, topics=None, since=None, limit=8, party=None,
     subprocess, so a pin-keyed lookup cannot work — and this also covers the
     UNPINNED machine-wide session, which the pin design would have missed
     entirely."""
+    stats = {} if stats is None else stats
+    wt, wg, wb = weights or BM25_WEIGHTS
+    fts = _fts_quote(query, match)
+    psql, pp, rsql, rp, ssql = _filters(party, all_parties, topics, since, include_stale)
+    n = _candidates(limit)
     con = _connect()
-    rows = con.execute(
-        """SELECT f.path, d.title, d.date, d.status,
-                  snippet(docs_fts, 3, '»', '«', ' … ', 22), d.party
-           FROM docs_fts f JOIN docs d ON d.path = f.path
-           WHERE docs_fts MATCH ? ORDER BY bm25(docs_fts) LIMIT ?""",
-        (_fts_quote(query), limit * 6)).fetchall()
-    out, suppressed = [], 0
-    for path, title, date, status, snip, rparty in rows:
-        # rparty is a comma-joined SET. Suppress when the document belongs to
-        # ANY client/prospect party other than the caller's single scope — an
-        # internal phrase co-occurring in the file must never exempt it.
-        doc_parties = {x for x in (rparty or "").split(",") if x}
-        if not all_parties and (doc_parties - ({party} if party else set())):
-            suppressed += 1
-            continue
-        if topics:
-            tags = (con.execute("SELECT tags FROM docs WHERE path=?",
-                                (path,)).fetchone() or [""])[0]
-            if topics.lower() not in tags.lower() and topics.lower() not in path.lower():
-                continue
-        if since and (not date or date < since):
-            continue
-        out.append((path, title, date, status, snip))
-        if len(out) >= limit:
-            break
+    base = "FROM docs_fts f JOIN docs d ON d.path = f.path WHERE docs_fts MATCH ?"
+    lex = con.execute(
+        f"""SELECT f.path, snippet(docs_fts, 3, '»', '«', ' … ', 22) {base}
+            AND {psql} AND {rsql} AND {ssql}
+            ORDER BY bm25(docs_fts, 0.0, ?, ?, ?) LIMIT ?""",
+        [fts] + pp + rp + [wt, wg, wb, n]).fetchall()
+    # Suppressed = party docs that WOULD have been candidates: the top n of the
+    # same ranking with isolation switched off. Counting every OR-match made a
+    # plain question report ~90 hidden docs, and an always-firing warning gets
+    # ignored (board 2026-08-25, chair finding (c)).
+    suppressed = con.execute(
+        f"""SELECT COUNT(*) FROM (SELECT d.party {base} AND {rsql} AND {ssql}
+            ORDER BY bm25(docs_fts, 0.0, ?, ?, ?) LIMIT ?) WHERE NOT (
+            {psql.replace('d.party', 'party')})""",
+        [fts] + rp + [wt, wg, wb, n] + pp).fetchone()[0]
+    stats["stale_hidden"] = 0 if include_stale else con.execute(
+        f"SELECT COUNT(*) {base} AND {psql} AND {rsql} AND NOT {ssql}",
+        [fts] + pp + rp).fetchone()[0]
+
+    ranked = {p: {"bm25": i} for i, (p, _s) in enumerate(lex)}
+    snippets = dict(lex)
+    vec = None if vectors is False else _vector_ranks(query, stats)
+    if vec:
+        # The sidecar scores EVERY embedded doc; apply the same SQL filters to
+        # all of them, THEN take the top n (never filter a pre-cut list).
+        # path -> mtime of the LIVE docs row. A chunk whose mtime differs was
+        # cut from other text than the row (and party tag) now describes:
+        # never print it (board 2026-09-19 must-fix 1(iii)).
+        allowed = dict(con.execute(
+            f"SELECT d.path, d.mtime FROM docs d WHERE {psql} AND {rsql} AND {ssql}", pp + rp))
+        kept = [(p, s, t) for p, s, t, m in vec if p in allowed and allowed[p] == m][:n]
+        for i, (p, _s, t) in enumerate(kept):
+            ranked.setdefault(p, {})["vec"] = i
+            if p not in snippets:
+                snippets[p] = " ".join(t.split("\n", 1)[-1].split()[:40]) + " …"
+
+    meta = {}
+    if ranked:
+        qs = ",".join("?" * len(ranked))
+        meta = {r[0]: r[1:] for r in con.execute(
+            f"SELECT path, title, date, status FROM docs WHERE path IN ({qs})", list(ranked))}
     con.close()
+    scored = []
+    for p, r in ranked.items():
+        if p not in meta:
+            continue
+        s = 0.0
+        if "bm25" in r:
+            s += BM25_WEIGHT / (RRF_K + r["bm25"] + 1)
+        if "vec" in r:
+            s += VECTOR_WEIGHT / (RRF_K + r["vec"] + 1)
+        scored.append((-s, r.get("bm25", math.inf), p))
+    scored.sort()
+    out = [(p, *meta[p], snippets.get(p, "")) for _s, _b, p in scored[:limit]]
+    stats["keyword_hits"] = len(lex)
+    stats["meaning_only"] = {p for p, *_ in out if "bm25" not in ranked[p]}
+    stats["missing_terms"], stats["coverage"] = _term_coverage(
+        query, [p for p, *_ in out], psql + f" AND {ssql}", pp)
     return out, suppressed
+
+
+def _term_coverage(query, paths, scope_sql, scope_p):
+    """OR matching finds SOMETHING for nearly any question (8/8 unanswerable
+    eval questions got keyword hits, vs 0/8 under AND). So say how much each
+    hit matched, and which query terms NO in-scope doc contains: a question
+    about a topic the vault never mentions says so. Counted within the
+    caller's party scope, so it never reveals a word that only party docs hold.
+    Returns ([missing terms], {path: (matched, total)})."""
+    terms = [t for t in dict.fromkeys(re.findall(r"\w+", query))
+             if t.lower() not in _STOP]
+    if len(terms) < 2:
+        return [], {}
+    con = _connect()
+    missing, hits = [], {p: 0 for p in paths}
+    for t in terms:
+        found = {r[0] for r in con.execute(
+            f"""SELECT f.path FROM docs_fts f JOIN docs d ON d.path = f.path
+                WHERE docs_fts MATCH ? AND {scope_sql}""", [f'"{t}"'] + scope_p)}
+        if not found:
+            missing.append(t)
+        for p in paths:
+            hits[p] += p in found
+    con.close()
+    return missing, {p: (k, len(terms)) for p, k in hits.items()}
 
 
 def main():
@@ -311,6 +579,12 @@ def main():
     ap.add_argument("--party", help="scope to ONE party slug (see the registry)")
     ap.add_argument("--all-parties", action="store_true",
                     help="deliberately include every party's results")
+    ap.add_argument("--include-stale", action="store_true",
+                    help="also show docs whose status is SUPERSEDED/OBSOLETE/ARCHIVED")
+    ap.add_argument("--no-vectors", action="store_true",
+                    help="keyword (BM25) search only; skip the meaning-search sidecar")
+    ap.add_argument("--rebuild-vectors", action="store_true",
+                    help="re-embed every document with the local model, then exit")
     ap.add_argument("--capabilities", action="store_true",
                     help="print the capability manifest digest and exit")
     args = ap.parse_args()
@@ -329,36 +603,82 @@ def main():
 
     if args.rebuild:
         index(rebuild=True, verbose=True)
-        if not args.query:
+        if not args.query and not args.rebuild_vectors:
             return 0
+    if args.rebuild_vectors:
+        index()
+        if not (os.path.exists(EMBED_PY) and os.path.isdir(EMBED_MODEL)):
+            print("[recall] meaning search is not installed (see docs/RECALL-VECTORS.md)",
+                  file=sys.stderr)
+            return 1
+        return subprocess.run([EMBED_PY, SIDECAR, "index", "--rebuild", "--db", DB,
+                               "--vdb", VDB, "--model", EMBED_MODEL]).returncode
     if not args.query:
         ap.print_usage()
         return 1
     if not args.no_reindex:
         index()  # incremental; cheap
     q = " ".join(args.query)
+    if args.party:
+        slugs = {slug for slug, _k, _p in load_registry()}
+        if "," in args.party or (slugs and args.party not in slugs):
+            print(f"[recall] --party takes ONE registered slug; got {args.party!r}",
+                  file=sys.stderr)
+            return 2
+    stats = {}
     hits, suppressed = search(q, topics=args.topics, since=args.since,
                               limit=args.limit, party=args.party,
-                              all_parties=args.all_parties)
-    if not hits and not suppressed:
+                              all_parties=args.all_parties,
+                              include_stale=args.include_stale,
+                              vectors=False if args.no_vectors else None, stats=stats)
+    vstat = stats.get("vectors", "")
+    # Fail-open must never be SILENT: say when BM25 carried this search alone.
+    if vstat.startswith("unavailable"):
+        print(f"[recall] meaning search {vstat}; keyword results only", file=sys.stderr)
+    elif vstat == "missing":
+        print("[recall] meaning search was installed (vectors.db exists) but its "
+              "sidecar/model is gone; keyword results only. Reinstall: "
+              "scripts/install_recall_vectors.sh", file=sys.stderr)
+    elif vstat.startswith("on ("):
+        print(f"[recall] meaning search {vstat}", file=sys.stderr)
+    if not hits and not suppressed and not stats.get("stale_hidden"):
         print(f"[recall] no hits for: {q}")
         return 0
     if suppressed:
         # Counted and VISIBLE at the moment of the near-miss — the operator is
         # already reading this output.
-        print(f"⚠ {suppressed} result(s) suppressed (party-scoped isolation). "
+        print(f"⚠ {suppressed} keyword result(s) suppressed (party-scoped isolation). "
               f"Use --party <slug> for one party, or --all-parties, "
               f"deliberately.")
+    if stats.get("stale_hidden"):
+        print(f"ℹ {stats['stale_hidden']} superseded/obsolete doc(s) hidden. "
+              f"Use --include-stale to see them.")
     if not hits:
         print(f"[recall] no unsuppressed hits for: {q}")
         return 0
+    if stats.get("missing_terms"):
+        print(f"ℹ no document in scope mentions: {', '.join(stats['missing_terms'])} "
+              f"(results below match other words only)")
+    if not stats.get("keyword_hits"):
+        # Meaning search ranks EVERY doc, so it always "finds" something. An
+        # honest "no record of that" must survive it (board 2026-09-19 #6).
+        print(f"[recall] no keyword hits for: {q}; nearest by meaning "
+              f"(may be unrelated):")
     home = os.path.expanduser("~")
+    meaning_only = stats.get("meaning_only", set())
+    links = related([h[0] for h in hits], party=args.party,
+                    all_parties=args.all_parties, include_stale=args.include_stale)
     for path, title, date, status, snip in hits:
-        meta = " · ".join(x for x in (date, status) if x)
+        cov = stats.get("coverage", {}).get(path)
+        tag = ("meaning match only" if path in meaning_only
+               else f"{cov[0]}/{cov[1]} terms" if cov else "")
+        meta = " · ".join(x for x in (date, (status or "")[:60], tag) if x)
         print(f"• {path.replace(home, '~')}  ({meta})" if meta
               else f"• {path.replace(home, '~')}")
         print(f"  {title}")
         print(f"  {snip.strip()}".replace("\n", " ")[:300])
+        if links.get(path):
+            print("  ↳ links: " + ", ".join(os.path.basename(p)[:-3] for p in links[path]))
     return 0
 
 

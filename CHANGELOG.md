@@ -7,6 +7,46 @@ All notable changes to Engram are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **Hybrid `recall`** (retrieval review 2026-09-19, patterns from NornicDB):
+  optional LOCAL meaning search (`scripts/recall_vec.py`, bge-small ONNX,
+  pinned + sha256-verified by `scripts/install_recall_vectors.sh`) fused with
+  BM25 by Reciprocal Rank Fusion (k=60). Fail-open with a stderr notice;
+  `recall.py` itself stays stdlib-only. See `docs/RECALL-VECTORS.md`.
+- **`evals/run_retrieval.py`** — Hit@1/Hit@5/MRR@10 per question shape against
+  a gitignored ground-truth set (hash printed per run), dev/test split with a
+  tested keep-the-incumbent `pick()`, `--baseline-ref` to score the pre-change
+  code, and a false-hit rate on unanswerable questions. MRR 0.36 → 0.67 on 80
+  live questions (0.09 → 0.49 excluding the saturated keyword shape).
+- **Honest "no record" output**: `k/n terms` per hit, `no document in scope
+  mentions: …`, `meaning match only` tags, and a `no keyword hits` banner.
+- **Stale docs hidden by default**: a status that STARTS with
+  SUPERSEDED/OBSOLETE/ARCHIVED/DEPRECATED, or an `archive/` path, is hidden and
+  counted; `--include-stale` reveals it.
+- **`↳ links:`** — 1-hop `[[wikilink]]` / `(file.md)` neighbours per hit, behind
+  the same party and stale filters.
+
+### Changed
+- **OR-matched BM25.** Every query word was previously required, so plain
+  questions matched almost nothing (paraphrase Hit@5 0.03). Field weights are
+  plumbed but stay equal (5:2:1 tied on the held-out half).
+- **Suppressed count is relevance-bounded** and labelled "keyword result(s)":
+  party docs that would have been candidates (top `max(limit*2, 20)` with
+  isolation off), not every doc sharing one word.
+- `--party` takes exactly one registered slug (a comma-joined value exposed a
+  two-party doc; board 2026-09-19).
+- Index schema 3 (adds `links`); an older cache rebuilds itself.
+
+### Fixed
+- **`recall` filtered AFTER its `LIMIT limit*6` cut**, so eligible docs ranked
+  below it silently vanished (`recall SOW` returned 6 of 8 with 16 eligible
+  docs unreturned). Party, topic, date and stale filters now run inside the SQL.
+- Board 2026-09-19 (FIX-THEN-SHIP) before first release: stale vector chunks
+  could print a party's OLD text in default scope; one slow inline re-embed
+  could time out forever and hold a write lock over every other session; a
+  query starting with `-` could inject sidecar options; the installer claimed
+  "verified" on macOS bash 3.2 without checking. All fixed with tests that run
+  the real `update()` in stdlib CI.
+
 - **`memory_lint.py --projects`** — the D4 stray-auto-memory detector
   (board 2026-08-24, `machine/memory-v2/board-2026-08-24-d4/`). Stat-only scan of
   every project slug's auto-memory dir; slugs identified by blake2b hash, never

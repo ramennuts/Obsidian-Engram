@@ -6,6 +6,10 @@ we load them from disk rather than as packages.
 import importlib.util
 import os
 
+# Hermetic by default: the optional meaning-search sidecar must never run
+# against a test's temp vault (CI has no model). Vector tests opt back in.
+os.environ.setdefault("ENGRAM_RECALL_VECTORS", "0")
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 

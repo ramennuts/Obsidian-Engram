@@ -124,6 +124,20 @@ class TestInputHandling(Base):
         with self.assertRaises(ValueError):
             r.search("BOTHMARK", party="acme-co,beta-llc")
 
+    def test_cli_refuses_a_comma_or_unregistered_party(self):
+        import subprocess
+        self._w(os.path.join(self.vault, "both.md"), "Acme Co and Beta LLC: BOTHMARK\n")
+        cli = os.path.join(conftest_paths.ROOT, "scripts", "recall.py")
+        env = dict(os.environ, ENGRAM_VAULT=self.vault, ENGRAM_MEMORY=self.memory)
+        for bad in ("acme-co,beta-llc", "acme-typo"):
+            p = subprocess.run([sys.executable, cli, "--party", bad, "BOTHMARK"],
+                               capture_output=True, text=True, env=env)
+            self.assertEqual(p.returncode, 2, bad)
+            self.assertNotIn("both.md", p.stdout)
+        ok = subprocess.run([sys.executable, cli, "--party", "acme-co", "BOTHMARK"],
+                            capture_output=True, text=True, env=env)
+        self.assertEqual(ok.returncode, 0)
+
     def test_a_dash_leading_query_reaches_the_sidecar_as_a_query(self):
         """No `--` before the query let "-x"/"--vdb=…" parse as sidecar options."""
         seen = os.path.join(self.root, "argv.json")

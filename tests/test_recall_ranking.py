@@ -115,6 +115,81 @@ class TestOrMatching(Base):
                          "an all-stopword query still searches rather than going empty")
 
 
+class TestInputHandling(Base):
+    def test_comma_joined_party_is_refused_not_matched(self):
+        """`--party a,b` string-equalled a two-party doc's tag and exposed it
+        (board 2026-09-19 AUDIT-A #2); main's set logic kept it hidden."""
+        self._w(os.path.join(self.vault, "both.md"), "Acme Co and Beta LLC: BOTHMARK\n")
+        r = self._recall()
+        with self.assertRaises(ValueError):
+            r.search("BOTHMARK", party="acme-co,beta-llc")
+
+    def test_a_dash_leading_query_reaches_the_sidecar_as_a_query(self):
+        """No `--` before the query let "-x"/"--vdb=…" parse as sidecar options."""
+        seen = os.path.join(self.root, "argv.json")
+        stub = os.path.join(self.root, "stub.py")
+        self._w(stub, "import json, sys\n"
+                      f"json.dump(sys.argv[1:], open({seen!r}, 'w'))\n"
+                      "print(json.dumps({'stale': 0, 'results': []}))\n")
+        os.makedirs(os.path.join(self.root, "model"))
+        try:
+            r = self._recall(ENGRAM_RECALL_VECTORS="1", ENGRAM_EMBED_PY=sys.executable,
+                             ENGRAM_RECALL_SIDECAR=stub,
+                             ENGRAM_EMBED_MODEL=os.path.join(self.root, "model"))
+            r.search("--vdb=/tmp/elsewhere")
+            with open(seen) as f:
+                argv = json.load(f)
+            self.assertEqual(argv[-2:], ["--", "--vdb=/tmp/elsewhere"])
+        finally:
+            for k in ("ENGRAM_EMBED_PY", "ENGRAM_RECALL_SIDECAR", "ENGRAM_EMBED_MODEL"):
+                os.environ.pop(k, None)
+            os.environ["ENGRAM_RECALL_VECTORS"] = "0"
+
+
+class TestHonestNoRecord(Base):
+    """Board 2026-09-19 #6 + eval: OR matching and meaning search both find
+    SOMETHING for a question the vault can't answer. The output must say so."""
+
+    def test_a_term_no_doc_contains_is_reported(self):
+        self._w(os.path.join(self.vault, "v.md"), "vendor contract notes\n")
+        r = self._recall()
+        stats = {}
+        rows, _ = r.search("which vendor contract covers the forklifts", stats=stats)
+        self.assertTrue(rows, "OR matching still returns the vendor doc")
+        self.assertEqual(stats["missing_terms"], ["covers", "forklifts"])
+        self.assertEqual(stats["coverage"][rows[0][0]], (2, 4))
+
+    def test_missing_terms_never_reveal_a_word_only_party_docs_hold(self):
+        self._w(os.path.join(self.vault, "v.md"), "vendor contract notes\n")
+        self._w(os.path.join(self.vault, "a.md"), "Acme Co ZEBRAWORD pricing\n")
+        r = self._recall()
+        stats = {}
+        r.search("vendor ZEBRAWORD", stats=stats)
+        self.assertEqual(stats["missing_terms"], ["ZEBRAWORD"],
+                         "default scope: the party doc's word counts as absent")
+        stats = {}
+        r.search("vendor ZEBRAWORD", party="acme-co", stats=stats)
+        self.assertEqual(stats["missing_terms"], [])
+
+    def test_cli_labels_meaning_only_results_when_no_keyword_hits(self):
+        import subprocess
+        self._w(os.path.join(self.vault, "m.md"), "entirely different words\n")
+        stub = os.path.join(self.root, "stub.py")
+        mt = os.stat(os.path.join(self.vault, "m.md")).st_mtime
+        self._w(stub, "import json\nprint(json.dumps({'stale': 0, 'results': "
+                      f"[[{os.path.join(self.vault, 'm.md')!r}, 0.4, 't\\nx', {mt!r}]]}}))\n")
+        os.makedirs(os.path.join(self.root, "model"))
+        env = dict(os.environ, ENGRAM_VAULT=self.vault, ENGRAM_MEMORY=self.memory,
+                   ENGRAM_RECALL_VECTORS="1", ENGRAM_EMBED_PY=sys.executable,
+                   ENGRAM_RECALL_SIDECAR=stub,
+                   ENGRAM_EMBED_MODEL=os.path.join(self.root, "model"))
+        out = subprocess.run([sys.executable, os.path.join(conftest_paths.ROOT, "scripts",
+                                                           "recall.py"), "QQNOTHING"],
+                             capture_output=True, text=True, env=env).stdout
+        self.assertIn("no keyword hits", out)
+        self.assertIn("meaning match only", out)
+
+
 class TestStaleDocs(Base):
     def setUp(self):
         super().setUp()
@@ -193,6 +268,35 @@ class TestVectorFusion(Base):
             os.environ.pop(k, None)
         os.environ["ENGRAM_RECALL_VECTORS"] = "0"
 
+    def _mt(self, name):
+        return os.stat(os.path.join(self.vault, name)).st_mtime
+
+    def test_a_chunk_cut_from_other_text_is_never_shown(self):
+        """Must-fix 1(iii): the chunk's mtime must equal the LIVE docs row's,
+        or its text belongs to a version the party tag no longer describes."""
+        self._docs()
+        v = self.vault
+        env = self._stub({"stale": 0, "results": [
+            [os.path.join(v, "meaning.md"), 0.9, "t\nOLD TEXT Acme Co 9999",
+             self._mt("meaning.md") - 100]]})
+        r = self._recall(**env)
+        rows, _ = r.search("VECMARK")
+        self.assertNotIn("meaning.md", [os.path.basename(p) for p, *_ in rows])
+
+    def test_vanished_sidecar_is_announced_when_it_was_installed(self):
+        self._docs()
+        env = self._stub({"stale": 0, "results": []})
+        env["ENGRAM_EMBED_PY"] = os.path.join(self.root, "gone", "python")
+        r = self._recall(**env)
+        stats = {}
+        r.search("VECMARK", stats=stats)
+        self.assertEqual(stats["vectors"], "not installed", "never installed: stay quiet")
+        os.makedirs(os.path.dirname(r.VDB), exist_ok=True)
+        open(r.VDB, "w").close()
+        stats = {}
+        r.search("VECMARK", stats=stats)
+        self.assertEqual(stats["vectors"], "missing", "was installed: must be announced")
+
     def _docs(self):
         self._w(os.path.join(self.vault, "kw.md"), "VECMARK keyword doc\n")
         self._w(os.path.join(self.vault, "meaning.md"), "no shared words at all\n")
@@ -202,15 +306,17 @@ class TestVectorFusion(Base):
         self._docs()
         v = self.vault
         env = self._stub({"stale": 0, "results": [
-            [os.path.join(v, "acme.md"), 0.99, "t\nAcme Co confidential"],
-            [os.path.join(v, "meaning.md"), 0.9, "t\nno shared words at all"],
-            [os.path.join(v, "kw.md"), 0.5, "t\nVECMARK keyword doc"]]})
+            [os.path.join(v, "acme.md"), 0.99, "t\nAcme Co confidential", self._mt("acme.md")],
+            [os.path.join(v, "meaning.md"), 0.9, "t\nno shared words at all",
+             self._mt("meaning.md")],
+            [os.path.join(v, "kw.md"), 0.5, "t\nVECMARK keyword doc", self._mt("kw.md")]]})
         r = self._recall(**env)
         stats = {}
         rows, _ = r.search("VECMARK", stats=stats)
         names = [os.path.basename(p) for p, *_ in rows]
         self.assertEqual(stats["vectors"], "on")
         self.assertIn("meaning.md", names)
+        self.assertEqual(stats["meaning_only"], {os.path.join(v, "meaning.md")})
         self.assertNotIn("acme.md", names, "the vector branch must obey party isolation")
         self.assertEqual(names[0], "kw.md", "in both lists → ranks first under RRF")
 

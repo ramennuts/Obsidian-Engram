@@ -35,6 +35,65 @@ def check(label, ok, detail="", fix=""):
     return ok is True
 
 
+def recall_health(vault=None, now=None):
+    """[(label, ok, detail, fix)] for `recall`: is it being used, and is the
+    optional meaning search installed and caught up? The meaning-search
+    sidecar fails OPEN (keyword-only), so this line is its named backstop."""
+    import sqlite3
+    import time
+    vault = vault or VAULT
+    now = now or time.time()
+    rdir = os.path.join(vault, ".recall")
+    idx, vdb = os.path.join(rdir, "index.db"), os.path.join(rdir, "vectors.db")
+    out = []
+    if not os.path.isfile(idx):
+        return [("recall index", "warn", "never built",
+                 "run `python3 scripts/recall.py --rebuild` once")]
+    days = (now - os.path.getmtime(idx)) / 86400
+    usage = os.path.join(vault, "machine", "metrics", "recall-usage.jsonl")
+    # Usage comes from the search log, NOT the index's mtime: any rebuild
+    # refreshes the index, which made three unused weeks look healthy.
+    recent, logged = 0, os.path.isfile(usage)
+    if logged:
+        cutoff = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(now - 7 * 86400))
+        with open(usage, encoding="utf-8") as f:
+            for line in f:
+                try:
+                    recent += json.loads(line).get("ts", "") >= cutoff
+                except ValueError:
+                    continue
+    healthy = recent > 0 if logged else days <= 7
+    out.append(("recall in use", True if healthy else "warn",
+                f"{recent} search(es) in the last 7 days" if logged
+                else f"no usage log yet; index last refreshed {days:.0f} day(s) ago",
+                "nothing is searching past work: sessions should run recall before "
+                "re-deriving it (the bootstrap teaches this)"))
+    embed_py = os.path.expanduser("~/.cache/engram-embed/venv/bin/python")
+    if not os.path.isfile(vdb):
+        out.append(("recall meaning search (optional)", "warn", "not installed; keyword only",
+                    "scripts/install_recall_vectors.sh, then recall.py --rebuild-vectors"))
+        return out
+    if not os.path.exists(embed_py):
+        out.append(("recall meaning search", "warn",
+                    "vectors.db exists but the sidecar venv is gone (keyword only)",
+                    "re-run scripts/install_recall_vectors.sh"))
+        return out
+    try:
+        c, d = sqlite3.connect(vdb, timeout=2), sqlite3.connect(idx, timeout=2)
+        fresh = dict(d.execute("SELECT path, mtime FROM docs"))
+        have = dict(c.execute("SELECT path, MAX(mtime) FROM chunks GROUP BY path"))
+        c.close()
+        d.close()
+    except sqlite3.Error as e:
+        return out + [("recall meaning search", "warn", f"unreadable ({e})", "")]
+    behind = sum(1 for p, m in fresh.items() if have.get(p) != m)
+    out.append(("recall meaning search", True if behind <= 25 else "warn",
+                f"{len(fresh) - behind}/{len(fresh)} docs embedded",
+                "run any recall search (it catches up 15 s at a time) or "
+                "`python3 scripts/recall.py --rebuild-vectors`"))
+    return out
+
+
 def main():
     print(f"Engram doctor — vault: {tilde(VAULT)}\n")
     passed = True
@@ -103,6 +162,9 @@ def main():
     else:
         check("Durable-memory layer", "warn", "ENGRAM_MEMORY not set",
               "optional — set ENGRAM_MEMORY to your memory/ dir to enable Layer-1 checks")
+
+    for label, ok, detail, fix in recall_health():
+        check(label, ok, detail, fix)       # advisory: never fails the doctor
 
     print()
     if passed:

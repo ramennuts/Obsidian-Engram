@@ -204,6 +204,40 @@ class TestHonestNoRecord(Base):
         self.assertIn("meaning match only", out)
 
 
+class TestBestMatchWarning(Base):
+    """The per-doc suppressed count fired on 92% of ordinary questions; the loud
+    warning now fires only when a hidden party doc would be the #1 match
+    (6% of internal questions, 7/8 party questions asked unscoped)."""
+
+    def _setup(self):
+        self._w(os.path.join(self.vault, "acme.md"),
+                "Acme Co BESTMARK BESTMARK BESTMARK retainer terms\n")
+        self._w(os.path.join(self.vault, "note.md"), "internal note, one BESTMARK\n")
+        return self._recall()
+
+    def test_fires_when_a_hidden_party_doc_is_the_best_match(self):
+        r = self._setup()
+        st = {}
+        rows, _ = r.search("BESTMARK retainer", stats=st)
+        self.assertTrue(st["party_top1"])
+        self.assertEqual([os.path.basename(p) for p, *_ in rows], ["note.md"])
+
+    def test_quiet_when_an_internal_doc_is_the_best_match(self):
+        r = self._setup()
+        st = {}
+        r.search("internal note", stats=st)
+        self.assertFalse(st["party_top1"])
+
+    def test_quiet_when_already_scoped_to_that_party(self):
+        r = self._setup()
+        st = {}
+        r.search("BESTMARK retainer", party="acme-co", stats=st)
+        self.assertFalse(st["party_top1"])
+        st = {}
+        r.search("BESTMARK retainer", party="beta-llc", stats=st)
+        self.assertTrue(st["party_top1"], "the OTHER party is still hidden")
+
+
 class TestStaleDocs(Base):
     def setUp(self):
         super().setUp()

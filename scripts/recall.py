@@ -37,6 +37,7 @@ Each change above was kept only if evals/run_retrieval.py showed a gain on
 BOTH halves of the question set; see docs/RECALL-VECTORS.md for numbers.
 """
 import argparse
+import datetime
 import hashlib
 import json
 import math
@@ -60,6 +61,10 @@ SIDECAR = os.environ.get("ENGRAM_RECALL_SIDECAR",
 SIDECAR_TIMEOUT = 60
 SCHEMA = "3"                           # bump → the disposable cache rebuilds
 MANIFEST = os.path.join(VAULT, "machine", "capability-manifest.md")
+# One line per search, COUNTS ONLY: a query can name a client, so query text is
+# never written. Exists so "are sessions actually using recall?" is measured
+# (nothing ran it 2026-08-29 → 09-19) instead of guessed.
+USAGE_LOG = os.path.join(VAULT, "machine", "metrics", "recall-usage.jsonl")
 ALLOW_ROOTS = [VAULT, MEMORY]          # the ONLY trees ever indexed
 SKIP_DIRS = {".git", ".obsidian", ".trash", ".recall", "node_modules",
              "__pycache__", ".venv",
@@ -266,11 +271,14 @@ def index(rebuild=False, verbose=False):
     if not row or row[0] != SCHEMA:
         rebuild = True
     con.execute("INSERT OR REPLACE INTO meta VALUES('schema', ?)", (SCHEMA,))
+    # Read BEFORE a rebuild clears the table: a doc deleted since the last
+    # index must still register as gone so its vectors get purged (board
+    # 2026-09-19 follow-up 4).
+    known = dict(con.execute("SELECT path, mtime FROM docs"))
     if rebuild:
         con.execute("DELETE FROM docs")
         con.execute("DELETE FROM docs_fts")
         con.execute("DELETE FROM links")
-    known = dict(con.execute("SELECT path, mtime FROM docs"))
     seen, added, removed = set(), 0, []
     for path in _walk():
         seen.add(path)
@@ -320,10 +328,7 @@ def index(rebuild=False, verbose=False):
 
 
 # Only used in OR mode, where a bare "the"/"what" would match every doc.
-_STOP = frozenset("""a an and are as at be but by can could did do does for from had has
-have how i if in into is it its me my of on or our should so than that the their them then
-there these they this to was we were what when where which who why will with would you
-your yet now actually just still""".split())
+_STOP = frozenset(["a", "an", "and", "are", "as", "at", "be", "but", "by", "can", "could", "did", "do", "does", "for", "from", "had", "has", "have", "how", "i", "if", "in", "into", "is", "it", "its", "me", "my", "of", "on", "or", "our", "should", "so", "than", "that", "the", "their", "them", "then", "there", "these", "they", "this", "to", "was", "we", "were", "what", "when", "where", "which", "who", "why", "will", "with", "would", "you", "your", "yet", "now", "actually", "just", "still"])
 
 
 def _purge_vectors(paths):
@@ -420,6 +425,8 @@ def _vector_ranks(query, stats):
         stats["vectors"] = "on"
         if out.get("stale"):
             stats["vectors"] = f"on ({out['stale']} docs not yet embedded)"
+        elif out.get("busy"):
+            stats["vectors"] = "on (another session is updating the vector index)"
         return [(r[0], r[1], r[2], r[3]) for r in out.get("results", [])]
     except subprocess.TimeoutExpired:
         stats["vectors"] = ("unavailable (timed out; run `recall.py --rebuild-vectors` "
@@ -515,6 +522,9 @@ def search(query, topics=None, since=None, limit=8, party=None,
             if p not in snippets:
                 snippets[p] = " ".join(t.split("\n", 1)[-1].split()[:40]) + " …"
 
+    stats["party_top1"] = False if all_parties else _party_is_best(
+        con, fts, rsql, rp, ssql, (wt, wg, wb), n, vec, party)
+
     meta = {}
     if ranked:
         qs = ",".join("?" * len(ranked))
@@ -540,6 +550,32 @@ def search(query, topics=None, since=None, limit=8, party=None,
     return out, suppressed
 
 
+def _party_is_best(con, fts, rsql, rp, ssql, weights, n, vec, party):
+    """Would a HIDDEN party doc be the single best match with isolation off?
+    Measured 2026-09-19: the per-doc suppressed count fires on 92% of ordinary
+    questions (the always-on warning the 2026-08-25 board rejected), a fused
+    top-8 near-miss on 72%, but a hidden party doc at #1 on only 6% of them,
+    and on 7 of 8 genuinely party questions asked without --party. Only this
+    earns the loud warning. It never names the party."""
+    blind = [r[0] for r in con.execute(
+        f"""SELECT f.path FROM docs_fts f JOIN docs d ON d.path = f.path
+            WHERE docs_fts MATCH ? AND {rsql} AND {ssql}
+            ORDER BY bm25(docs_fts, 0.0, ?, ?, ?) LIMIT ?""",
+        [fts] + rp + list(weights) + [n])]
+    score = {p: BM25_WEIGHT / (RRF_K + i + 1) for i, p in enumerate(blind)}
+    tags = {p: (pt or "", m) for p, pt, m in con.execute(
+        f"SELECT d.path, d.party, d.mtime FROM docs d WHERE {rsql} AND {ssql}", rp)}
+    if vec:
+        live = [p for p, _s, _t, m in vec if p in tags and tags[p][1] == m]
+        for i, p in enumerate(live[:n]):
+            score[p] = score.get(p, 0.0) + VECTOR_WEIGHT / (RRF_K + i + 1)
+    if not score:
+        return False
+    best = max(score, key=score.get)
+    doc_parties = {x for x in tags.get(best, ("", 0))[0].split(",") if x}
+    return bool(doc_parties - ({party} if party else set()))
+
+
 def _term_coverage(query, paths, scope_sql, scope_p):
     """OR matching finds SOMETHING for nearly any question (8/8 unanswerable
     eval questions got keyword hits, vs 0/8 under AND). So say how much each
@@ -552,7 +588,7 @@ def _term_coverage(query, paths, scope_sql, scope_p):
     if len(terms) < 2:
         return [], {}
     con = _connect()
-    missing, hits = [], {p: 0 for p in paths}
+    missing, hits = [], dict.fromkeys(paths, 0)
     for t in terms:
         found = {r[0] for r in con.execute(
             f"""SELECT f.path FROM docs_fts f JOIN docs d ON d.path = f.path
@@ -563,6 +599,20 @@ def _term_coverage(query, paths, scope_sql, scope_p):
             hits[p] += p in found
     con.close()
     return missing, {p: (k, len(terms)) for p, k in hits.items()}
+
+
+def _log_usage(hits, stats, scoped):
+    try:
+        os.makedirs(os.path.dirname(USAGE_LOG), exist_ok=True)
+        with open(USAGE_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "ts": datetime.datetime.now().isoformat(timespec="seconds"),
+                "hits": len(hits), "keyword_hits": stats.get("keyword_hits", 0),
+                "vectors": stats.get("vectors", "").split(" ")[0],
+                "no_record_signal": bool(stats.get("missing_terms")),
+                "scoped": scoped}) + "\n")
+    except OSError:
+        pass                      # a metric must never break a search
 
 
 def main():
@@ -631,6 +681,7 @@ def main():
                               all_parties=args.all_parties,
                               include_stale=args.include_stale,
                               vectors=False if args.no_vectors else None, stats=stats)
+    _log_usage(hits, stats, scoped=bool(args.party or args.all_parties))
     vstat = stats.get("vectors", "")
     # Fail-open must never be SILENT: say when BM25 carried this search alone.
     if vstat.startswith("unavailable"):
@@ -644,12 +695,14 @@ def main():
     if not hits and not suppressed and not stats.get("stale_hidden"):
         print(f"[recall] no hits for: {q}")
         return 0
+    if stats.get("party_top1"):
+        # Loud only when it matters: the best match is a hidden party doc.
+        print("⚠ The BEST match for this is a client/prospect document, hidden by "
+              "party isolation. If this session works for that party, re-run with "
+              "--party <slug> (or --all-parties, deliberately).")
     if suppressed:
-        # Counted and VISIBLE at the moment of the near-miss — the operator is
-        # already reading this output.
-        print(f"⚠ {suppressed} keyword result(s) suppressed (party-scoped isolation). "
-              f"Use --party <slug> for one party, or --all-parties, "
-              f"deliberately.")
+        print(f"ℹ {suppressed} keyword result(s) from client/prospect docs hidden "
+              f"(party isolation).")
     if stats.get("stale_hidden"):
         print(f"ℹ {stats['stale_hidden']} superseded/obsolete doc(s) hidden. "
               f"Use --include-stale to see them.")

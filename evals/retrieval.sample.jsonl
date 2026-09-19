@@ -1,0 +1,2 @@
+{"id": "k01", "shape": "keyword", "q": "zoho seats decision", "expect": ["vault/decisions/zoho.md"], "note": "format sample only; the real set is evals/retrieval.local.jsonl (gitignored)"}
+{"id": "p01", "shape": "paraphrase", "q": "which email suite did we pick and how many people get accounts?", "expect": ["vault/decisions/zoho.md"], "note": "same target, different words"}
